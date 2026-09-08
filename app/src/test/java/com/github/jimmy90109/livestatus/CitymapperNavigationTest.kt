@@ -157,6 +157,44 @@ class CitymapperNavigationTest {
     }
 
     @Test
+    fun classifiesObservedTrainWaitingWithoutDepartureTime() {
+        val source =
+            "1207 苗栗-Miaoli (北湖-Beihu | 嘉義-Chiayi | 苗栗-Miaoli)\n" +
+                "11, 25, 57分鐘\n預計抵達時間：下午3:25到達"
+        val presentation = presentation(source)
+
+        assertEquals(
+            CitymapperNavigationPresentation(
+                CitymapperNavigationStage.WAITING,
+                CitymapperTransitMode.TRAIN,
+                transitTiming = countdown(11),
+            ),
+            presentation,
+        )
+        assertEquals(R.drawable.ic_train_notification, LiveStatusReminder.citymapperIcon(presentation))
+    }
+
+    @Test
+    fun trainWaitingRequiresRoutePathAndValidCountdown() {
+        for (text in listOf(
+            "1207 苗栗-Miaoli\n11, 25, 57分鐘",
+            "1207 苗栗-Miaoli (北湖-Beihu | 嘉義-Chiayi | 苗栗-Miaoli)\n即將抵達",
+            "1207 苗栗-Miaoli (北湖-Beihu | 嘉義-Chiayi | 苗栗-Miaoli)\n11, soon分鐘",
+        )) {
+            assertEquals(text, CitymapperNavigationPresentation(), presentation(text))
+        }
+
+        assertEquals(
+            CitymapperTransitMode.BUS,
+            presentation("等候 1207 (示例站)\n11, 25, 57分鐘").transitMode,
+        )
+        assertEquals(
+            CitymapperNavigationStage.TRAIN_DEPARTURE,
+            presentation("14:18 1201 新竹-Hsinchu\n下午3:11 (95分鐘)到達").stage,
+        )
+    }
+
+    @Test
     fun parsesSharedCountdownAndScheduledFormatsForUnknownWaitingModes() {
         val cases = listOf(
             "等候 K (示例站)\n3, 8, 16分鐘" to countdown(3),
@@ -341,6 +379,23 @@ class CitymapperNavigationTest {
         tracker.onPosted("trip", update("trip", 12, presentation = waiting(CitymapperTransitMode.UNKNOWN)))
         val afterUnknownWaiting = tracker.onPosted("trip", update("trip", 13, presentation = riding(2))) as CitymapperNavigationDecision.Show
         assertEquals(CitymapperTransitMode.UNKNOWN, afterUnknownWaiting.update.presentation.transitMode)
+    }
+
+    @Test
+    fun trackerCarriesObservedTrainWaitingModeToRiding() {
+        val tracker = CitymapperNavigationTracker()
+        val trainWaiting = presentation(
+            "1207 苗栗-Miaoli (北湖-Beihu | 嘉義-Chiayi | 苗栗-Miaoli)\n11, 25, 57分鐘",
+        )
+
+        tracker.onPosted("trip", update("trip", 1, presentation = trainWaiting))
+        val riding = tracker.onPosted(
+            "trip",
+            update("trip", 2, presentation = riding(5)),
+        ) as CitymapperNavigationDecision.Show
+
+        assertEquals(CitymapperTransitMode.TRAIN, riding.update.presentation.transitMode)
+        assertEquals(R.drawable.ic_train_notification, LiveStatusReminder.citymapperIcon(riding.update.presentation))
     }
 
     @Test

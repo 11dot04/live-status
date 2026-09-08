@@ -72,6 +72,7 @@ internal object CitymapperNavigationMapper {
     private val englishRiding = Regex("""^Ride\s+(\d+)\s+stops?\s+to$""", RegexOption.IGNORE_CASE)
     private val chineseRemainingStops = Regex("""^[（(]\s*還有\s*(\d+)\s*站\s*[）)]$""")
     private val trainDeparture = Regex("""^((?:[01]?\d|2[0-3]):[0-5]\d)\s+\d{3,4}\s+\S.+$""")
+    private val trainWaiting = Regex("""^\d{3,4}\s+.+\s+\((?:[^|()]+\|)+[^|()]+\)$""")
 
     fun isShareLabel(title: String?): Boolean = shareLabels.any {
         it.equals(normalizeLine(title.orEmpty()), ignoreCase = true)
@@ -174,6 +175,17 @@ internal object CitymapperNavigationMapper {
                 stage = CitymapperNavigationStage.TRAIN_DEPARTURE,
                 transitMode = CitymapperTransitMode.TRAIN,
                 transitTiming = CitymapperTransitTiming.ScheduledTime(departureTime),
+            )
+        }
+
+        val trainCountdown = body.firstNotNullOfOrNull {
+            transitTiming(it) as? CitymapperTransitTiming.CountdownMinutes
+        }
+        if (trainWaiting.matches(title) && trainCountdown != null) {
+            return CitymapperNavigationPresentation(
+                stage = CitymapperNavigationStage.WAITING,
+                transitMode = CitymapperTransitMode.TRAIN,
+                transitTiming = trainCountdown,
             )
         }
 
