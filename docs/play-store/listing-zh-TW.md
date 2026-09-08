@@ -99,7 +99,7 @@ LiveStatus 需要通知存取權，才能讀取媒體工作階段與指定 App �
 ・可可靠辨識時，PIN 會顯示在即時狀態提醒中
 ・你可以隨時在 Android 系統設定關閉通知存取
 
-系統需求：Android 16 或更新版本。Live Update 顯示方式依裝置支援情況而定。
+系統需求：Android 16 或更新版本。Live Update 顯示方式依裝置支援情況而定；目前已知部分 ASUS Android 16 韌體可能只顯示一般持續通知，不會顯示狀態列膠囊或鎖定畫面即時動態。
 
 【注意事項】
 LiveStatus 是第三方通知輔助工具，並非 Discord、Microsoft Teams、Google 時鐘、Google Recorder、YPT、Hevy、Strava、Citymapper、iPASS MONEY、台灣 Pay、YouBike、foodpanda、McDonald's、55688、Uber、Uber Eats 或 Pikmin Bloom 官方 App。第三方 App 的通知格式可能因版本、地區、語言或系統設定而有所不同，因此部分狀態可能無法顯示或即時更新。

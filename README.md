@@ -2,6 +2,8 @@
 
 這是一個 Android 16 App，會監聽媒體播放、Discord、Microsoft Teams、Google 時鐘、Google Recorder、YPT、Hevy、Strava、iPASS MONEY、台灣 Pay、YouBike、foodpanda、McDonald's、55688、Uber、Uber Eats 與 Pikmin Bloom 的通知，將重要狀態轉成持續顯示的 Live Update。
 
+Live Update 的狀態列膠囊、鎖定畫面與通知排序由系統及 OEM 實作決定。目前已知部分 ASUS Android 16 韌體不會將第三方通知提升為完整 Live Update；App 仍會建立一般持續通知，並在 ASUS／ROG 裝置內顯示相容性提醒。
+
 ## 功能
 
 ### 媒體播放

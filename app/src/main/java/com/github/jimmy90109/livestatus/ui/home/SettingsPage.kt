@@ -154,6 +154,8 @@ internal fun BrandWarningCard(
                             "⚠ Samsung Now Bar 可能限制第三方 Live Updates"
                         BrandWarning.XIAOMI_HYPER_ISLAND ->
                             stringResource(R.string.xiaomi_hyperos_warning_title)
+                        BrandWarning.ASUS_LIVE_UPDATES ->
+                            stringResource(R.string.asus_live_updates_warning_title)
                     },
                     18,
                     colors.warningText,
@@ -178,23 +180,32 @@ internal fun BrandWarningCard(
                 colors.warningText,
             )
             BrandWarning.XIAOMI_HYPER_ISLAND -> XiaomiWarningDescription()
+            BrandWarning.ASUS_LIVE_UPDATES -> AppText(
+                stringResource(R.string.asus_live_updates_warning_description),
+                15,
+                colors.warningText,
+            )
         }
-        if (brandWarning == BrandWarning.SAMSUNG_NOW_BAR) {
-            Spacer(Modifier.height(14.dp))
-            ActionButton(
-                "查看解決方法  →",
-                colors.warningText,
-                colors.warningContainer,
-                onClick = onOpenSamsungNowBarGuide,
-            )
-        } else {
-            Spacer(Modifier.height(14.dp))
-            ActionButton(
-                stringResource(R.string.xiaomi_open_app_settings),
-                colors.warningText,
-                colors.warningContainer,
-                onClick = onOpenAppSettings,
-            )
+        when (brandWarning) {
+            BrandWarning.SAMSUNG_NOW_BAR -> {
+                Spacer(Modifier.height(14.dp))
+                ActionButton(
+                    "查看解決方法 →",
+                    colors.warningText,
+                    colors.warningContainer,
+                    onClick = onOpenSamsungNowBarGuide,
+                )
+            }
+            BrandWarning.XIAOMI_HYPER_ISLAND -> {
+                Spacer(Modifier.height(14.dp))
+                ActionButton(
+                    stringResource(R.string.xiaomi_open_app_settings),
+                    colors.warningText,
+                    colors.warningContainer,
+                    onClick = onOpenAppSettings,
+                )
+            }
+            BrandWarning.ASUS_LIVE_UPDATES -> Unit
         }
     }
 }

@@ -213,23 +213,8 @@ open class HomeScreenHostActivity : ComponentActivity() {
             .launchUrl(this, url.toUri())
     }
 
-    private fun isSamsungDevice(): Boolean =
-        Build.MANUFACTURER.equals("samsung", ignoreCase = true) ||
-            Build.BRAND.equals("samsung", ignoreCase = true)
-
-    private fun isXiaomiDevice(): Boolean =
-        isXiaomiFamily(Build.MANUFACTURER) || isXiaomiFamily(Build.BRAND)
-
-    private fun detectBrandWarning(): BrandWarning? = when {
-        isSamsungDevice() -> BrandWarning.SAMSUNG_NOW_BAR
-        isXiaomiDevice() -> BrandWarning.XIAOMI_HYPER_ISLAND
-        else -> null
-    }
-
-    private fun isXiaomiFamily(value: String?): Boolean {
-        val normalized = value?.lowercase()?.trim().orEmpty()
-        return normalized == "xiaomi" || normalized == "redmi" || normalized == "poco"
-    }
+    private fun detectBrandWarning(): BrandWarning? =
+        detectBrandWarning(Build.MANUFACTURER, Build.BRAND)
 
     private fun openIpass() = openPackage(IPASS_PACKAGE, "iPASS MONEY")
 

@@ -28,6 +28,8 @@
     <string name="xiaomi_hyperos_warning_floating_notification">若通知已出現但膠囊沒有出現，允許浮動或焦點通知。</string>
     <string name="xiaomi_hyperos_warning_footer">不同 HyperOS 版本與地區的選單名稱可能略有差異；下方按鈕會開啟本 App 的系統設定頁。</string>
     <string name="xiaomi_open_app_settings">開啟 App 設定  →</string>
+    <string name="asus_live_updates_warning_title">⚠ ASUS 系統尚未支援完整 Live Updates</string>
+    <string name="asus_live_updates_warning_description">目前已知部分 ASUS Android 16 韌體不會將第三方通知提升為狀態列膠囊或鎖定畫面即時動態；提醒仍可作為一般持續通知使用，實際顯示可能隨系統更新改變。</string>
     <string name="app_card_collapsed">試用選項已收起</string>
     <string name="app_card_expanded">試用選項已展開</string>
     <string name="app_card_expand">試用即時通知功能</string>
