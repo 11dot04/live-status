@@ -30,8 +30,8 @@ class CitymapperNotificationTest {
         for (visibility in listOf(Notification.VISIBILITY_PUBLIC, Notification.VISIBILITY_PRIVATE, Notification.VISIBILITY_SECRET)) {
             val source = Notification.Builder(context, "trip-progress")
                 .setSmallIcon(R.drawable.ic_navigation_notification)
-                .setContentTitle("Ride 7 stops to")
-                .setContentText("示例站\nArrive 6:08 PM (127 min)")
+                .setContentTitle("乘坐 6 站")
+                .setContentText("(還有 2 站)\n基隆轉運站-Keelung Transit Station\n下午3:39到達")
                 .setOngoing(true)
                 .setVisibility(visibility)
                 .setContentIntent(open)
@@ -45,9 +45,12 @@ class CitymapperNotificationTest {
             assertEquals(open, rendered.contentIntent)
             assertEquals(listOf("End Trip", "Next"), rendered.actions.map { it.title.toString() })
             assertEquals(listOf(end, next), rendered.actions.map { it.actionIntent })
-            assertEquals("Ride 7 stops to", rendered.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
-            assertEquals("示例站\n預計抵達時間：6:08 PM到達", rendered.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString())
-            assertEquals("7站下車", rendered.shortCriticalText)
+            assertEquals("乘坐 6 站", rendered.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+            assertEquals(
+                "(還有 2 站)\n基隆轉運站-Keelung Transit Station\n預計抵達時間：下午3:39到達",
+                rendered.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString(),
+            )
+            assertEquals("2站下車", rendered.shortCriticalText)
             assertEquals(R.drawable.ic_transit_notification, rendered.smallIcon.resId)
             assertTrue(rendered.flags and Notification.FLAG_ONGOING_EVENT != 0)
             assertTrue(rendered.extras.getBoolean("android.requestPromotedOngoing"))
@@ -84,6 +87,8 @@ class CitymapperNotificationTest {
             "14:18 1201 新竹-Hsinchu\n下午3:11 (95分鐘)到達" to ("14:18發車" to R.drawable.ic_train_notification),
             "等候 BL (往亞東醫院)\n3, 8, 16分鐘" to ("3分捷運" to R.drawable.ic_metro_notification),
             "等候 R (示例站)\n3, 8, 16分鐘" to ("3分捷運" to R.drawable.ic_metro_notification),
+            "乘坐 6 站\n(還有 2 站)\n基隆轉運站" to ("2站下車" to R.drawable.ic_transit_notification),
+            "乘坐 6 站\n基隆轉運站" to ("導航" to R.drawable.ic_transit_notification),
             "Wait for shuttle (Example Stop)\n2:03 PM, 2:04 PM" to ("2:03發車" to R.drawable.ic_transit_notification),
         )
         for ((text, expected) in cases) {
@@ -137,7 +142,7 @@ class CitymapperNotificationTest {
             CitymapperSimulation.BUS_WAITING to ("11分公車" to R.drawable.ic_bus_notification),
             CitymapperSimulation.TRAIN_DEPARTURE to ("2:03發車" to R.drawable.ic_train_notification),
             CitymapperSimulation.METRO_WAITING to ("3分捷運" to R.drawable.ic_metro_notification),
-            CitymapperSimulation.METRO_RIDING to ("4站下車" to R.drawable.ic_metro_notification),
+            CitymapperSimulation.METRO_RIDING to ("2站下車" to R.drawable.ic_metro_notification),
         )
         val notificationIds = mutableSetOf<Int>()
         for ((simulation, presentation) in expected) {

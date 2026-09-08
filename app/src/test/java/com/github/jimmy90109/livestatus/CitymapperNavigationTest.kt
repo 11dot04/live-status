@@ -68,8 +68,12 @@ class CitymapperNavigationTest {
             presentation("等候 107 或 107 或 201 或 202 (基隆漁會-Keelung Fishmens Association)\n11, 12, 18分鐘\n下午3:11 (96分鐘)到達"),
         )
         assertEquals(
-            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, stops = 6),
-            presentation("乘坐 6 站\n基隆轉運站-Keelung Transit Station\n下午3:11 (95分鐘)到達"),
+            CitymapperNavigationPresentation(
+                CitymapperNavigationStage.RIDING,
+                totalStops = 6,
+                remainingStops = 2,
+            ),
+            presentation("乘坐 6 站\n(還有 2 站)\n基隆轉運站-Keelung Transit Station\n下午3:11 (95分鐘)到達"),
         )
         assertEquals(
             CitymapperNavigationPresentation(
@@ -80,7 +84,7 @@ class CitymapperNavigationTest {
             presentation("14:18 1201 新竹-Hsinchu\n下午3:11 (95分鐘)到達"),
         )
         assertEquals(
-            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, stops = 8),
+            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, totalStops = 8),
             presentation("乘坐 8 站\n南港-Nangang\n下午3:11 (94分鐘)到達"),
         )
         assertEquals(
@@ -92,8 +96,48 @@ class CitymapperNavigationTest {
             presentation("等候 BL (往亞東醫院 Taipei Nangang Exhibition To Far Eastern Hospital)\n3, 8, 16分鐘\n下午3:11 (94分鐘)到達"),
         )
         assertEquals(
-            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, stops = 4),
+            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, totalStops = 4),
             presentation("乘坐 4 站\n市政府-Taipei City Hall\n下午3:11 (93分鐘)到達"),
+        )
+    }
+
+    @Test
+    fun parsesOnlyValidObservedRemainingStopsForRiding() {
+        for (line in listOf("(還有 2 站)", "（還有2站）", "(  還有   2   站  )")) {
+            assertEquals(
+                CitymapperNavigationPresentation(
+                    CitymapperNavigationStage.RIDING,
+                    totalStops = 6,
+                    remainingStops = 2,
+                ),
+                presentation("乘坐 6 站\n$line\n基隆轉運站"),
+            )
+        }
+
+        for (line in listOf(
+            "(還有兩站)",
+            "(還有 2 分鐘)",
+            "還有 2 站",
+            "(還有 0 站)",
+            "(還有 7 站)",
+            "(2 站)",
+        )) {
+            assertEquals(
+                line,
+                CitymapperNavigationPresentation(
+                    CitymapperNavigationStage.RIDING,
+                    totalStops = 6,
+                ),
+                presentation("乘坐 6 站\n$line\n基隆轉運站"),
+            )
+        }
+        assertEquals(
+            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, totalStops = 6),
+            presentation("乘坐 6 站\n基隆轉運站"),
+        )
+        assertEquals(
+            CitymapperNavigationPresentation(CitymapperNavigationStage.WALKING),
+            presentation("步行至公車站\n(還有 2 站)"),
         )
     }
 
@@ -274,6 +318,8 @@ class CitymapperNavigationTest {
         assertEquals(CitymapperTransitMode.BUS, bus.update.presentation.transitMode)
         val busRide = tracker.onPosted("trip", update("trip", 2, presentation = riding(6))) as CitymapperNavigationDecision.Show
         assertEquals(CitymapperTransitMode.BUS, busRide.update.presentation.transitMode)
+        assertEquals(6, busRide.update.presentation.totalStops)
+        assertEquals(2, busRide.update.presentation.remainingStops)
 
         tracker.onPosted("trip", update("trip", 3, presentation = trainDeparture()))
         val trainRide = tracker.onPosted("trip", update("trip", 4, presentation = riding(8))) as CitymapperNavigationDecision.Show
@@ -351,8 +397,10 @@ class CitymapperNavigationTest {
     private fun waiting(mode: CitymapperTransitMode) = CitymapperNavigationPresentation(
         CitymapperNavigationStage.WAITING, mode, transitTiming = countdown(3),
     )
-    private fun riding(stops: Int) = CitymapperNavigationPresentation(
-        CitymapperNavigationStage.RIDING, stops = stops,
+    private fun riding(totalStops: Int, remainingStops: Int? = 2) = CitymapperNavigationPresentation(
+        CitymapperNavigationStage.RIDING,
+        totalStops = totalStops,
+        remainingStops = remainingStops,
     )
     private fun trainDeparture() = CitymapperNavigationPresentation(
         CitymapperNavigationStage.TRAIN_DEPARTURE,

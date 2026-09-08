@@ -784,8 +784,8 @@ object LiveStatusReminder {
             context.getString(R.string.citymapper_live_walking_minutes, it)
         } ?: context.getString(R.string.citymapper_live_walking)
         CitymapperNavigationStage.WAITING -> citymapperWaitingCriticalText(context, presentation)
-        CitymapperNavigationStage.RIDING -> presentation.stops?.let {
-            context.getString(R.string.citymapper_live_stops, it)
+        CitymapperNavigationStage.RIDING -> presentation.remainingStops?.let {
+            context.getString(R.string.citymapper_live_remaining_stops, it)
         } ?: context.getString(R.string.citymapper_live_critical_text)
         CitymapperNavigationStage.TRAIN_DEPARTURE ->
             (presentation.transitTiming as? CitymapperTransitTiming.ScheduledTime)?.let {

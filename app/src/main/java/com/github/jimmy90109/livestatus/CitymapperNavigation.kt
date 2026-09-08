@@ -33,7 +33,8 @@ internal data class CitymapperNavigationPresentation(
     val transitMode: CitymapperTransitMode = CitymapperTransitMode.UNKNOWN,
     val walkingMinutes: Int? = null,
     val transitTiming: CitymapperTransitTiming? = null,
-    val stops: Int? = null,
+    val totalStops: Int? = null,
+    val remainingStops: Int? = null,
 )
 
 internal data class CitymapperNavigationMapping(
@@ -69,6 +70,7 @@ internal object CitymapperNavigationMapper {
     )
     private val chineseRiding = Regex("""^乘坐\s+(\d+)\s+站$""")
     private val englishRiding = Regex("""^Ride\s+(\d+)\s+stops?\s+to$""", RegexOption.IGNORE_CASE)
+    private val chineseRemainingStops = Regex("""^[（(]\s*還有\s*(\d+)\s*站\s*[）)]$""")
     private val trainDeparture = Regex("""^((?:[01]?\d|2[0-3]):[0-5]\d)\s+\d{3,4}\s+\S.+$""")
 
     fun isShareLabel(title: String?): Boolean = shareLabels.any {
@@ -154,10 +156,16 @@ internal object CitymapperNavigationMapper {
             )
         }
 
-        val stops = (chineseRiding.matchEntire(title) ?: englishRiding.matchEntire(title))
+        val totalStops = (chineseRiding.matchEntire(title) ?: englishRiding.matchEntire(title))
             ?.groupValues?.get(1)?.toIntOrNull()
-        if (stops != null) {
-            return CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, stops = stops)
+        if (totalStops != null) {
+            val remainingStops = body.firstNotNullOfOrNull(::remainingStops)
+                ?.takeIf { it in 1..totalStops }
+            return CitymapperNavigationPresentation(
+                stage = CitymapperNavigationStage.RIDING,
+                totalStops = totalStops,
+                remainingStops = remainingStops,
+            )
         }
 
         val departureTime = trainDeparture.matchEntire(title)?.groupValues?.get(1)
@@ -175,6 +183,9 @@ internal object CitymapperNavigationMapper {
     private fun walkingMinutes(line: String): Int? =
         (chineseWalkingMinutes.matchEntire(line) ?: englishWalkingMinutes.matchEntire(line))
             ?.groupValues?.get(1)?.toIntOrNull()
+
+    private fun remainingStops(line: String): Int? = chineseRemainingStops.matchEntire(line)
+        ?.groupValues?.get(1)?.toIntOrNull()
 
     private fun transitTiming(line: String): CitymapperTransitTiming? {
         val minutes = (chineseWaitingMinutes.matchEntire(line) ?: englishWaitingMinutes.matchEntire(line))

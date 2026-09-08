@@ -37,7 +37,7 @@
 ## 台灣通勤階段樣本（2026-09-01）
 
 - 真實 `trip-progress` payload 已觀察到「步行至公車站」與距離分鐘、數字路線公車候車與到站分鐘、「乘坐 N 站」、台鐵發車時間／車次／目的地，以及 BL 捷運候車與到站分鐘。
-- 短膠囊採時間優先格式：「8分步行」、「11分公車」、「14:18發車」、「3分捷運」；搭乘階段顯示「N站下車」。步行、公車、台鐵、捷運與未知搭乘分別使用對應的單色圖示。
+- 短膠囊採時間優先格式：「8分步行」、「11分公車」、「14:18發車」、「3分捷運」；搭乘階段的「N站下車」改用正文明確提供的剩餘站數。步行、公車、台鐵、捷運與未知搭乘分別使用對應的單色圖示。
 - 同一來源通知會將最近明確辨認的公車、台鐵或捷運模式延續到後續「乘坐 N 站」；步行、新來源、reset、來源移除與重新連線的孤立搭乘階段不沿用舊模式。
 - 分類僅涵蓋上述已觀察句型。單車、YouBike、開車、渡輪、其他捷運線碼與未知候車格式維持通用導航呈現，待取得真實 payload 後再擴充。
 - `./gradlew test assembleDebug lintDebug assembleDebugAndroidTest --no-daemon --max-workers=1` 通過；289 項 JVM 測試全部成功，Lint 無錯誤、11 項既有警告，Debug App 與測試 APK 均成功組裝。
@@ -55,8 +55,15 @@
 
 ## 卡片核心狀態模擬（2026-09-01）
 
-- Citymapper 卡片依步行、公車、台鐵與捷運分組，提供步行 8 分鐘、公車候車 11 分鐘、台鐵下午 2:03 發車、捷運候車 3 分鐘及捷運搭乘 4 站五種固定模擬。
+- Citymapper 卡片依步行、公車、台鐵與捷運分組，提供步行 8 分鐘、公車候車 11 分鐘、台鐵下午 2:03 發車、捷運候車 3 分鐘及捷運總共 6 站／還有 2 站五種固定模擬。
 - 每個按鈕直接建立具明確 stage、mode 與 timing 的本機 update，使用同一通知 ID 覆蓋前一狀態；不依賴 tracker、不附來源 actions，也不寫入 Debug payload。
 - 模擬按鈕受 Citymapper 開關與必要設定控制；清除按鈕可移除目前模擬或來源映射提醒，Debug payload 操作仍只在 Debug build 顯示。
 - `./gradlew test assembleDebug lintDebug assembleDebugAndroidTest --no-daemon --max-workers=1` 通過；293 項 JVM 測試全部成功，Lint 無錯誤、11 項既有警告，Debug App 與測試 APK 均成功組裝。
 - Pixel 9 Pro XL（Android 17／API 37）執行 Citymapper 專屬 `connectedDebugAndroidTest`，8 項測試全部通過；五種 fixture 均驗證膠囊、small／左側圖示、無 timer／progress／來源 actions，以及 Citymapper fallback 點擊意圖。
+
+## 搭乘剩餘站數（2026-09-08）
+
+- 真實繁中通知在標題「乘坐 6 站」下另以正文獨立行「(還有 2 站)」提供剩餘站數；前者是該段總站數，後者才用於膠囊「2站下車」。
+- 剩餘站數僅接受一般／全形括號的獨立數字句型，必須大於 0 且不超過總站數；缺少或無效時回退「導航」，不以總站數代替、不依通知更新次數推算。
+- `./gradlew test assembleDebug lintDebug assembleDebugAndroidTest` 通過；聚焦的 Citymapper JVM 測試亦單獨通過。
+- Pixel 9 Pro XL（Android 17／API 37）執行 Citymapper 專屬 `connectedDebugAndroidTest`，8 項測試全部通過，包含「乘坐 6 站」、「(還有 2 站)」與膠囊「2站下車」的端到端驗證。
