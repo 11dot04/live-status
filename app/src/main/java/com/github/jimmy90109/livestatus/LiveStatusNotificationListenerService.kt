@@ -21,6 +21,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
     private val hevyWorkoutTracker = HevyWorkoutTracker()
     private val stravaRecordingTracker = StravaRecordingTracker()
     private val citymapperTracker = CitymapperNavigationTracker()
+    private val genericProgressTracker = GenericProgressTracker()
     private val citymapperPreferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == AppReminderPreferences.App.CITYMAPPER.preferenceKey) {
             if (AppReminderPreferences.App.CITYMAPPER.isEnabled(this)) {
@@ -30,6 +31,19 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             }
         }
     }
+    private val genericProgressPreferenceListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == AppReminderPreferences.App.GENERIC_PROGRESS.preferenceKey) {
+                if (AppReminderPreferences.App.GENERIC_PROGRESS.isEnabled(this)) {
+                    restoreGenericProgress(
+                        runCatching { activeNotifications }.getOrNull().orEmpty(),
+                    )
+                } else {
+                    genericProgressTracker.reset()
+                    LiveStatusReminder.clearAllGenericProgress(this)
+                }
+            }
+        }
     private val discordVoiceTracker = DiscordVoiceTracker()
     private val teamsCallTracker = TeamsCallTracker()
     private val recorderTracker = RecorderTracker()
@@ -58,6 +72,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         AppReminderPreferences.registerListener(this, citymapperPreferenceListener)
+        AppReminderPreferences.registerListener(this, genericProgressPreferenceListener)
     }
 
     override fun onNotificationPosted(statusBarNotification: StatusBarNotification) {
@@ -444,6 +459,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 }
             }
         }
+        handleGenericProgressPosted(statusBarNotification)
     }
 
     private fun parseHevyWorkout(
@@ -570,6 +586,11 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification) {
         mediaPlaybackMonitor.onNotificationRemoved(statusBarNotification)
+        if (statusBarNotification.packageName != packageName) {
+            handleGenericProgressDecision(
+                genericProgressTracker.onRemoved(statusBarNotification.key),
+            )
+        }
         if (statusBarNotification.packageName == CITYMAPPER_PACKAGE) {
             if (BuildConfig.DEBUG) {
                 val notification = statusBarNotification.notification
@@ -704,7 +725,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
     override fun onDestroy() {
         AppReminderPreferences.unregisterListener(this, citymapperPreferenceListener)
+        AppReminderPreferences.unregisterListener(this, genericProgressPreferenceListener)
         handleCitymapperDecision(citymapperTracker.reset())
+        genericProgressTracker.reset()
+        LiveStatusReminder.clearAllGenericProgress(this)
         stopClockTimerRefresh()
         mediaPlaybackMonitor.stop()
         super.onDestroy()
@@ -760,11 +784,14 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         restoreStravaRecording(activeNotifications)
         restoreCitymapperNavigation(activeNotifications)
         restoreMcDonaldsReadyOrder(activeNotifications)
+        restoreGenericProgress(activeNotifications)
         YouBikeRideManager.restore(this)
     }
 
     override fun onListenerDisconnected() {
         handleCitymapperDecision(citymapperTracker.reset())
+        genericProgressTracker.reset()
+        LiveStatusReminder.clearAllGenericProgress(this)
         mediaPlaybackMonitor.stop()
         super.onListenerDisconnected()
     }
@@ -780,6 +807,37 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             CitymapperNavigationDecision.Clear -> LiveStatusReminder.clearCitymapperNavigation(this)
             CitymapperNavigationDecision.None -> Unit
         }
+    }
+
+    private fun handleGenericProgressPosted(statusBarNotification: StatusBarNotification) {
+        val update = if (AppReminderPreferences.App.GENERIC_PROGRESS.isEnabled(this)) {
+            GenericProgressNotificationExtractor.extract(this, statusBarNotification)
+        } else {
+            null
+        }
+        handleGenericProgressDecision(
+            genericProgressTracker.onPosted(statusBarNotification.key, update),
+        )
+    }
+
+    private fun handleGenericProgressDecision(decision: GenericProgressDecision) {
+        when (decision) {
+            is GenericProgressDecision.Show ->
+                LiveStatusReminder.showGenericProgress(this, decision.update)
+            is GenericProgressDecision.Clear ->
+                LiveStatusReminder.clearGenericProgress(this, decision.sourceKey)
+        }
+    }
+
+    private fun restoreGenericProgress(notifications: Array<out StatusBarNotification>) {
+        genericProgressTracker.reset()
+        LiveStatusReminder.clearAllGenericProgress(this)
+        if (!AppReminderPreferences.App.GENERIC_PROGRESS.isEnabled(this)) return
+
+        val updates = notifications.mapNotNull {
+            GenericProgressNotificationExtractor.extract(this, it)
+        }
+        genericProgressTracker.restore(updates).forEach(::handleGenericProgressDecision)
     }
 
     private fun restoreCitymapperNavigation(notifications: Array<out StatusBarNotification>) {

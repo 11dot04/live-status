@@ -1,10 +1,17 @@
 # 即時狀態提醒
 
-這是一個 Android 16 App，會監聽媒體播放、Discord、Microsoft Teams、Google 時鐘、Google Recorder、YPT、Hevy、Strava、iPASS MONEY、台灣 Pay、YouBike、foodpanda、McDonald's、55688、Uber、Uber Eats 與 Pikmin Bloom 的通知，將重要狀態轉成持續顯示的 Live Update。
+這是一個 Android 16 App，會監聽所有 App 的確定進度通知，以及媒體播放、Discord、Microsoft Teams、Google 時鐘、Google Recorder、YPT、Hevy、Strava、iPASS MONEY、台灣 Pay、YouBike、foodpanda、McDonald's、55688、Uber、Uber Eats 與 Pikmin Bloom 的通知，將重要狀態轉成持續顯示的 Live Update。
 
 Live Update 的狀態列膠囊、鎖定畫面與通知排序由系統及 OEM 實作決定。目前已知部分 ASUS Android 16 韌體不會將第三方通知提升為完整 Live Update；App 仍會建立一般持續通知，並在 ASUS／ROG 裝置內顯示相容性提醒。
 
 ## 功能
+
+### 通用進度通知
+
+- 監聽所有 App 提供的確定進度條，將有效進度、來源 App、標題、內文、點擊行為與最多三個來源操作同步成各自獨立的 Live Update。
+- 不處理不確定進度與群組摘要；若來源已由系統提升，或屬於本 App 既有專用整合與媒體通知，則不建立重複提醒。
+- 來源進度更新時同步百分比；來源移除、不再提供有效進度、功能關閉或通知監聽器斷線時清除。重連時會從目前通知恢復，不保存歷史。
+- 功能位於「工具」分類並預設開啟，可由中性色卡片單獨關閉；通知頻道為低重要性且靜音。
 
 ### 媒體播放
 
@@ -190,7 +197,7 @@ Live Update 的狀態列膠囊、鎖定畫面與通知排序由系統及 OEM 實
 3. 允許 App 顯示通知。
 4. 在各 App 分頁使用模擬按鈕驗證狀態與進度。
 
-「Discord 語音頻道」功能預設開啟，可在媒體分頁單獨關閉。「媒體播放」功能在 Google／Pixel 預設開啟；Samsung、小米及其他 OEM 因通常已有系統媒體即時介面而預設關閉，仍可在媒體分頁手動開啟。手動設定後會保留使用者選擇。Discord 與媒體備援通知都使用靜音頻道，來源狀態更新不會主動發出提示音。
+「進度通知」功能預設開啟，可在工具分頁單獨關閉。「Discord 語音頻道」功能預設開啟，可在媒體分頁單獨關閉。「媒體播放」功能在 Google／Pixel 預設開啟；Samsung、小米及其他 OEM 因通常已有系統媒體即時介面而預設關閉，仍可在媒體分頁手動開啟。手動設定後會保留使用者選擇。通用進度、Discord 與媒體備援通知都使用靜音頻道，來源狀態更新不會主動發出提示音。
 
 Samsung One UI 8 若無法顯示在 Now Bar，可參考 GitHub Pages 的
 [Samsung Now Bar 疑難排解](https://jimmy90109.github.io/live-status-reminder/samsung-now-bar.html)。
@@ -205,6 +212,7 @@ HyperOS 的「設定 → 應用程式 → 權限 → 背景自啟動」允許本
 
 ## 敏感通知資料
 
+- 通用進度功能只在記憶體與目前本機 Live Update 中處理來源 App 名稱、notification key、標題、內文、進度及操作；來源移除、功能關閉或程序結束後不再保留，不會寫入檔案或上傳。
 - PIN 只保留在記憶體中，不會寫入檔案、偏好設定或正式日誌。
 - 55688 車牌只保留在目前 App 程序記憶體與本機提醒，不會上傳或永久儲存。
 - McDonald's 訂單號碼只用於目前本機取餐提醒，不會寫入檔案、偏好設定或正式日誌。

@@ -6,13 +6,16 @@ LiveStatus 即時狀態提醒
 
 ## 簡短說明
 
-將媒體、Discord／Teams 通話、倒數、錄音、健身、乘車與外送通知轉成 Android Live Update。
+將進度、媒體、通話、倒數、錄音、健身、乘車與外送通知轉成 Android Live Update。
 
 ## 完整說明
 
-LiveStatus 即時狀態提醒是一款為 Android 16 設計的通知輔助工具，會監聽媒體播放與指定應用程式的通知，將重要狀態轉換成持續顯示的 Live Update，讓你不用反覆打開 App，也能快速掌握正在播放內容、Discord 語音頻道、Microsoft Teams 通話、倒數計時、讀書與健身、外送、乘車與種花狀態。
+LiveStatus 即時狀態提醒是一款為 Android 16 設計的通知輔助工具，會監聽所有 App 的確定進度通知、媒體播放與指定應用程式的通知，將重要狀態轉換成持續顯示的 Live Update，讓你不用反覆打開 App，也能快速掌握下載等工作進度、正在播放內容、Discord 語音頻道、Microsoft Teams 通話、倒數計時、讀書與健身、外送、乘車與種花狀態。
 
 支援情境包含所有提供 Android MediaSession 與媒體通知的 App，以及 Discord 伺服器語音頻道、Microsoft Teams 進行中會議、Google 時鐘、Google Recorder、YPT、Hevy、Strava、Citymapper、iPASS MONEY、台灣 Pay、YouBike、foodpanda、McDonald's、55688、Uber、Uber Eats 與 Pikmin Bloom。
+
+【進度通知】
+所有 App 提供有效且可計算百分比的確定進度條時，LiveStatus 會同步來源 App、標題、內文、點擊行為與最多三個操作，並允許多項工作同時顯示。來源已由系統原生提升、由本 App 的媒體或專用功能接管、屬於群組摘要或只提供不確定進度時不會重複建立。來源更新、完成並移除或不再符合時會同步更新或清除。功能預設開啟，可在工具分頁關閉。
 
 【媒體播放】
 當系統首選的活躍媒體工作階段正在播放、但來源通知尚未成為 Live Update 時，LiveStatus 會另外顯示曲名、作者、專輯與可用的切歌、播放、暫停或 podcast 倒退／快轉 15 秒控制。暫停後保留 1 分鐘方便恢復播放；停止、播放錯誤、工作階段或來源通知消失後會立即清除。Android 不允許修改其他 App 的通知，因此原始媒體通知仍會保留；備援通知是否被系統提升則依裝置支援情況而定。
@@ -81,6 +84,7 @@ LiveStatus 可依照通知內容顯示 Uber Eats 訂單進度，包含：
 
 【主要特色】
 ・將重要通知轉換成 Android 16 Live Update
+・同步所有 App 提供的確定進度條，支援多項進度同時顯示
 ・支援媒體播放、Discord 語音頻道、Microsoft Teams 通話、倒數與 Google Recorder 錄音計時、YPT 讀書、Hevy／Strava 運動、Citymapper 導航、外送、乘車碼、YouBike 費用、55688／Uber 乘車與 Pikmin Bloom 種花狀態提醒
 ・狀態結束後自動移除提醒
 ・點擊提醒可快速開啟對應 App
@@ -89,7 +93,7 @@ LiveStatus 可依照通知內容顯示 Uber Eats 訂單進度，包含：
 ・不會修改第三方 App 內容
 
 【權限說明】
-LiveStatus 需要通知存取權，才能讀取媒體工作階段與指定 App 的通知內容並轉換成即時狀態提醒。Discord 語音頻道與 Microsoft Teams 通話功能預設開啟，可在媒體分頁單獨關閉。媒體功能在 Google／Pixel 預設開啟；Samsung、小米及其他 OEM 因通常已有系統媒體即時介面而預設關閉，仍可在媒體分頁手動開啟，且會保留使用者選擇。YPT 讀書功能可在工具分頁單獨關閉，Hevy 健身功能可在運動分頁單獨關閉。YouBike 可選擇允許「鬧鐘與提醒」，只用於在費用變更邊界重新計算本機通知；不會顯示鬧鐘、播放聲音、連網或執行背景同步。所有解析都在裝置上進行，App 不會登入你的媒體、通訊、外送、支付、乘車、讀書、健身或遊戲帳號，也不會替你操作第三方服務。
+LiveStatus 需要通知存取權，才能讀取確定進度、媒體工作階段與指定 App 的通知內容並轉換成即時狀態提醒。通用進度功能預設開啟，可在工具分頁單獨關閉。Discord 語音頻道與 Microsoft Teams 通話功能預設開啟，可在媒體分頁單獨關閉。媒體功能在 Google／Pixel 預設開啟；Samsung、小米及其他 OEM 因通常已有媒體即時介面而預設關閉，仍可在媒體分頁手動開啟，且會保留使用者選擇。YPT 讀書功能可在工具分頁單獨關閉，Hevy 健身功能可在運動分頁單獨關閉。YouBike 可選擇允許「鬧鐘與提醒」，只用於在費用變更邊界重新計算本機通知；不會顯示鬧鐘、播放聲音、連網或執行背景同步。所有解析都在裝置上進行，App 不會登入你的媒體、通訊、外送、支付、乘車、讀書、健身或遊戲帳號，也不會替你操作第三方服務。
 
 【隱私優先】
 ・所有通知辨識都只在你的裝置上進行

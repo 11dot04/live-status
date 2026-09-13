@@ -162,6 +162,32 @@ internal fun MediaPlaybackCard(
 }
 
 @Composable
+internal fun GenericProgressCard(
+    enabled: Boolean,
+    interactionEnabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    val colors = LocalAppColors.current
+    val context = LocalContext.current
+    AppCard(
+        appName = stringResource(R.string.generic_progress_card_app_name),
+        appPackageName = "${context.packageName}.generic-progress",
+        fallbackIconRes = R.drawable.ic_notification,
+        title = stringResource(R.string.generic_progress_card_title),
+        description = stringResource(R.string.generic_progress_card_description),
+        supportedLanguages = listOf(stringResource(R.string.media_playback_language_independent)),
+        installed = true,
+        enabled = enabled,
+        interactionEnabled = interactionEnabled,
+        onEnabledChange = onEnabledChange,
+        usePackageIcon = false,
+        cardColor = colors.commonContainer,
+        labelColor = colors.commonSurface,
+        foregroundColor = colors.onSurface,
+    )
+}
+
+@Composable
 internal fun DiscordVoiceCard(
     installed: Boolean,
     enabled: Boolean,

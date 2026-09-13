@@ -132,6 +132,8 @@ open class HomeScreenHostActivity : ComponentActivity() {
             brandWarning = brandWarning,
             brandWarningDismissed =
                 AppReminderPreferences.isBrandWarningDismissed(this),
+            genericProgressEnabled =
+                AppReminderPreferences.App.GENERIC_PROGRESS.isEnabled(this),
             mediaPlaybackEnabled = AppReminderPreferences.App.MEDIA_PLAYBACK.isEnabled(this),
             clockEnabled = AppReminderPreferences.App.CLOCK.isEnabled(this, clockInstalled),
             ipassEnabled = AppReminderPreferences.App.IPASS.isEnabled(this, ipassInstalled),
@@ -272,6 +274,8 @@ open class HomeScreenHostActivity : ComponentActivity() {
 
     private fun clearReminder(app: AppReminderPreferences.App) {
         when (app) {
+            AppReminderPreferences.App.GENERIC_PROGRESS ->
+                LiveStatusReminder.clearAllGenericProgress(this)
             AppReminderPreferences.App.MEDIA_PLAYBACK -> LiveStatusReminder.clearMediaPlayback(this)
             AppReminderPreferences.App.CLOCK -> LiveStatusReminder.clearClockTimer(this)
             AppReminderPreferences.App.IPASS -> LiveStatusReminder.clear(this)
@@ -461,6 +465,7 @@ internal data class StatusSnapshot(
     val googleRecorderInstalled: Boolean = false,
     val brandWarning: BrandWarning? = null,
     val brandWarningDismissed: Boolean = false,
+    val genericProgressEnabled: Boolean = false,
     val mediaPlaybackEnabled: Boolean = false,
     val clockEnabled: Boolean = false,
     val ipassEnabled: Boolean = false,

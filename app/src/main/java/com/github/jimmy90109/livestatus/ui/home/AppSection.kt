@@ -341,6 +341,16 @@ internal fun AppsSection(
                         )
                     }
                     CATEGORY_TOOL -> {
+                        GenericProgressCard(
+                            enabled = status.genericProgressEnabled,
+                            interactionEnabled = status.requiredSettingsComplete,
+                            onEnabledChange = {
+                                onAppEnabledChange(
+                                    AppReminderPreferences.App.GENERIC_PROGRESS,
+                                    it,
+                                )
+                            },
+                        )
                         GoogleRecorderCard(
                             installed = status.googleRecorderInstalled,
                             enabled = status.googleRecorderEnabled,

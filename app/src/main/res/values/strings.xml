@@ -97,6 +97,11 @@
     <string name="media_playback_language_independent">不依賴語言</string>
     <string name="media_playback_limitation_title">優先使用系統原生媒體介面</string>
     <string name="media_playback_limitation_description">Pixel 預設開啟；Samsung、小米及其他 OEM 通常已有媒體即時介面，因此預設關閉，但仍可手動開啟。手動設定後會保留您的選擇。</string>
+    <string name="generic_progress_card_app_name">所有 App</string>
+    <string name="generic_progress_card_title">進度通知</string>
+    <string name="generic_progress_card_description">將其他 App 的確定進度條同步成 Live Update，保留點擊操作與最多三個來源按鈕。來源已由系統或專用功能顯示時不會重複建立。</string>
+    <string name="generic_progress_notification_channel_name">進度通知即時狀態</string>
+    <string name="generic_progress_notification_channel_description">靜音顯示其他 App 的確定進度，不播放提示音或震動。</string>
     <string name="discord_debug_open_payload">查看 Discord payload</string>
     <string name="discord_voice_card_title">語音通話</string>
     <string name="discord_voice_card_description">接通 Discord 私人通話或加入伺服器語音頻道後，顯示來源連線狀態、對方／頻道名稱與通話操作；掛斷或離開時自動移除。</string>

@@ -26,6 +26,7 @@ object LiveStatusReminder {
     internal const val GOOGLE_RECORDER_VISIBILITY = Notification.VISIBILITY_PUBLIC
     private const val CHANNEL_ID = "live_status"
     private const val MEDIA_CHANNEL_ID = "media_live_status"
+    private const val GENERIC_PROGRESS_CHANNEL_ID = "generic_progress_live_status_v1"
     private const val DISCORD_VOICE_CHANNEL_ID = "discord_voice_live_status_v2"
     private const val LEGACY_DISCORD_VOICE_CHANNEL_ID = "discord_voice_live_status"
     private const val TEAMS_CALL_CHANNEL_ID = "teams_call_live_status_v1"
@@ -49,6 +50,7 @@ object LiveStatusReminder {
     private const val STRAVA_RECORDING_NOTIFICATION_ID = 1016
     private const val CITYMAPPER_NOTIFICATION_ID = 1017
     private const val MCDONALDS_NOTIFICATION_ID = 1018
+    private const val GENERIC_PROGRESS_NOTIFICATION_ID = 1019
     private const val CITYMAPPER_CHANNEL_ID = "citymapper_navigation"
     private const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
     private val uberEatsArrivalEstimate = Regex(
@@ -77,6 +79,20 @@ object LiveStatusReminder {
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
             description = context.getString(R.string.media_notification_channel_description)
+            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            setSound(null, null)
+            enableVibration(false)
+        }
+        notificationManager(context).createNotificationChannel(channel)
+    }
+
+    private fun createGenericProgressChannel(context: Context) {
+        val channel = NotificationChannel(
+            GENERIC_PROGRESS_CHANNEL_ID,
+            context.getString(R.string.generic_progress_notification_channel_name),
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = context.getString(R.string.generic_progress_notification_channel_description)
             lockscreenVisibility = Notification.VISIBILITY_PRIVATE
             setSound(null, null)
             enableVibration(false)
@@ -1049,6 +1065,57 @@ object LiveStatusReminder {
             .setAuthenticationRequired(sourceAction.isAuthenticationRequired)
         sourceAction.remoteInputs.orEmpty().forEach(builder::addRemoteInput)
         return builder.build()
+    }
+
+    internal fun showGenericProgress(context: Context, update: GenericProgressUpdate) {
+        createGenericProgressChannel(context)
+        val progressStyle = Notification.ProgressStyle()
+            .setStyledByProgress(true)
+            .setProgress(update.progressPercent)
+            .addProgressSegment(
+                Notification.ProgressStyle.Segment(100).setId(1),
+            )
+        val builder = Notification.Builder(context, GENERIC_PROGRESS_CHANNEL_ID)
+            .setSmallIcon(
+                update.smallIcon
+                    ?: Icon.createWithResource(context, R.drawable.ic_notification),
+            )
+            .setContentTitle(update.title)
+            .setSubText(update.sourceAppName)
+            .setCategory(Notification.CATEGORY_PROGRESS)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setVisibility(update.visibility.normalizedNotificationVisibility())
+            .setColorized(false)
+            .setShortCriticalText("${update.progressPercent}%")
+            .setStyle(progressStyle)
+            .also(::requestPromotedOngoing)
+        update.contentText?.let(builder::setContentText)
+        update.contentIntent?.let(builder::setContentIntent)
+        update.largeIcon?.let(builder::setLargeIcon)
+        update.sourceActions.forEach(builder::addAction)
+
+        notificationManager(context).notify(
+            GenericProgressNotificationIdentity.tag(update.sourceKey),
+            GENERIC_PROGRESS_NOTIFICATION_ID,
+            builder.build(),
+        )
+    }
+
+    internal fun clearGenericProgress(context: Context, sourceKey: String) {
+        notificationManager(context).cancel(
+            GenericProgressNotificationIdentity.tag(sourceKey),
+            GENERIC_PROGRESS_NOTIFICATION_ID,
+        )
+    }
+
+    internal fun clearAllGenericProgress(context: Context) {
+        notificationManager(context).activeNotifications
+            .filter {
+                it.id == GENERIC_PROGRESS_NOTIFICATION_ID &&
+                    GenericProgressNotificationIdentity.isGenericProgressTag(it.tag)
+            }
+            .forEach { notificationManager(context).cancel(it.tag, it.id) }
     }
 
     @JvmStatic

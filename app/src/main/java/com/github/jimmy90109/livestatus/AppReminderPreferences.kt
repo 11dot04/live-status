@@ -16,6 +16,7 @@ object AppReminderPreferences {
     private const val BRAND_WARNING_DISMISSED = "brand_warning_dismissed"
 
     enum class App(internal val preferenceKey: String) {
+        GENERIC_PROGRESS("generic_progress_enabled"),
         MEDIA_PLAYBACK("media_playback_enabled"),
         CLOCK("clock_enabled"),
         IPASS("ipass_enabled"),
