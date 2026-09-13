@@ -90,6 +90,16 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                     handleCitymapperDecision(citymapperTracker.reset())
                 }
             }
+            TAIPEI_METRO_GO_PACKAGE -> if (BuildConfig.DEBUG) {
+                NotificationDebugPayloadStore.recordTaipeiMetroGo(
+                    this,
+                    statusBarNotification,
+                    notificationText,
+                    readNotificationTitle(notification),
+                    readNotificationContentText(notification),
+                    "POSTED",
+                )
+            }
             BOLT_PACKAGE -> if (BuildConfig.DEBUG) {
                 NotificationDebugPayloadStore.recordBolt(
                     this,
@@ -542,6 +552,22 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         )
     }
 
+    private fun recordTaipeiMetroGo(
+        statusBarNotification: StatusBarNotification,
+        lifecycle: String,
+    ) {
+        if (!BuildConfig.DEBUG) return
+        val notification = statusBarNotification.notification
+        NotificationDebugPayloadStore.recordTaipeiMetroGo(
+            this,
+            statusBarNotification,
+            readNotificationText(this, statusBarNotification.packageName, notification),
+            readNotificationTitle(notification),
+            readNotificationContentText(notification),
+            lifecycle,
+        )
+    }
+
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification) {
         mediaPlaybackMonitor.onNotificationRemoved(statusBarNotification)
         if (statusBarNotification.packageName == CITYMAPPER_PACKAGE) {
@@ -557,6 +583,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 )
             }
             handleCitymapperDecision(citymapperTracker.onRemoved(statusBarNotification.key))
+            return
+        }
+        if (BuildConfig.DEBUG && statusBarNotification.packageName == TAIPEI_METRO_GO_PACKAGE) {
+            recordTaipeiMetroGo(statusBarNotification, "REMOVED")
             return
         }
         if (BuildConfig.DEBUG && statusBarNotification.packageName == BOLT_PACKAGE) {
@@ -700,6 +730,9 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             activeNotifications
                 .filter { it.packageName == GOOGLE_RECORDER_PACKAGE }
                 .forEach { recordGoogleRecorder(it, "ACTIVE_SNAPSHOT") }
+            activeNotifications
+                .filter { it.packageName == TAIPEI_METRO_GO_PACKAGE }
+                .forEach { recordTaipeiMetroGo(it, "ACTIVE_SNAPSHOT") }
             activeNotifications
                 .filter { it.packageName == STRAVA_PACKAGE }
                 .forEach {
@@ -1148,6 +1181,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         private const val MCDONALDS_PACKAGE = "com.mcdonalds.mobileapp"
         private const val TAIWAN_TAXI_PACKAGE = "dbx.taiwantaxi"
         private const val CITYMAPPER_PACKAGE = CitymapperNavigationMapper.PACKAGE_NAME
+        private const val TAIPEI_METRO_GO_PACKAGE = "tw.com.trtc.is.android05"
         private const val BOLT_PACKAGE = "ee.mtakso.client"
         private const val UBER_RIDE_PACKAGE = "com.ubercab"
         private const val UBER_EATS_PACKAGE = "com.ubercab.eats"

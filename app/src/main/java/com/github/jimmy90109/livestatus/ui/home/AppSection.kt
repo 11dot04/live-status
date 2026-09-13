@@ -80,6 +80,7 @@ internal fun AppsSection(
     onOpenUberDebug: () -> Unit,
     onOpenBoltDebug: () -> Unit,
     onOpenCitymapperDebug: () -> Unit,
+    onOpenTaipeiMetroGoDebug: () -> Unit,
     onOpenUberEatsDebug: () -> Unit,
     onOpenYptDebug: () -> Unit,
     onOpenHevyDebug: () -> Unit,
@@ -283,15 +284,24 @@ internal fun AppsSection(
                             onOpenDebug = onOpenTaiwanTaxiDebug,
                         )
                     }
-                    CATEGORY_NAVIGATION -> CitymapperCard(
-                        installed = status.citymapperInstalled,
-                        enabled = status.citymapperEnabled,
-                        interactionEnabled = status.requiredSettingsComplete,
-                        onEnabledChange = {
-                            onAppEnabledChange(AppReminderPreferences.App.CITYMAPPER, it)
-                        },
-                        onOpenDebug = onOpenCitymapperDebug,
-                    )
+                    CATEGORY_NAVIGATION -> {
+                        CitymapperCard(
+                            installed = status.citymapperInstalled,
+                            enabled = status.citymapperEnabled,
+                            interactionEnabled = status.requiredSettingsComplete,
+                            onEnabledChange = {
+                                onAppEnabledChange(AppReminderPreferences.App.CITYMAPPER, it)
+                            },
+                            onOpenDebug = onOpenCitymapperDebug,
+                        )
+                        if (BuildConfig.DEBUG) {
+                            TaipeiMetroGoDebugCard(
+                                installed = status.taipeiMetroGoInstalled,
+                                interactionEnabled = status.requiredSettingsComplete,
+                                onOpenDebug = onOpenTaipeiMetroGoDebug,
+                            )
+                        }
+                    }
                     CATEGORY_RENTAL -> YouBikeCard(
                         installed = status.youBikeInstalled,
                         enabled = status.youBikeEnabled,

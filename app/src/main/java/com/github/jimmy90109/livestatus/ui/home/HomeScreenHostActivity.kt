@@ -95,6 +95,8 @@ open class HomeScreenHostActivity : ComponentActivity() {
         val uberInstalled = isPackageInstalled(UBER_PACKAGE)
         val boltInstalled = BuildConfig.DEBUG && isPackageInstalled(BOLT_PACKAGE)
         val citymapperInstalled = isPackageInstalled(CITYMAPPER_PACKAGE)
+        val taipeiMetroGoInstalled =
+            BuildConfig.DEBUG && isPackageInstalled(TAIPEI_METRO_GO_PACKAGE)
         val uberEatsInstalled = isPackageInstalled(UBER_EATS_PACKAGE)
         val pikminBloomInstalled = isPackageInstalled(PIKMIN_BLOOM_PACKAGE)
         val yptInstalled = isPackageInstalled(YPT_PACKAGE)
@@ -118,6 +120,7 @@ open class HomeScreenHostActivity : ComponentActivity() {
             boltInstalled = boltInstalled,
             citymapperInstalled = citymapperInstalled,
             citymapperEnabled = AppReminderPreferences.App.CITYMAPPER.isEnabled(this, citymapperInstalled),
+            taipeiMetroGoInstalled = taipeiMetroGoInstalled,
             uberEatsInstalled = uberEatsInstalled,
             pikminBloomInstalled = pikminBloomInstalled,
             yptInstalled = yptInstalled,
@@ -344,6 +347,7 @@ open class HomeScreenHostActivity : ComponentActivity() {
         private const val UBER_PACKAGE = "com.ubercab"
         private const val BOLT_PACKAGE = "ee.mtakso.client"
         private const val CITYMAPPER_PACKAGE = "com.citymapper.app.release"
+        private const val TAIPEI_METRO_GO_PACKAGE = "tw.com.trtc.is.android05"
         private const val UBER_EATS_PACKAGE = "com.ubercab.eats"
         private const val PIKMIN_BLOOM_PACKAGE = "com.nianticlabs.pikmin"
         private const val YPT_PACKAGE = YptStudyNotificationParser.PACKAGE_NAME
@@ -446,6 +450,7 @@ internal data class StatusSnapshot(
     val boltInstalled: Boolean = false,
     val citymapperInstalled: Boolean = false,
     val citymapperEnabled: Boolean = false,
+    val taipeiMetroGoInstalled: Boolean = false,
     val uberEatsInstalled: Boolean = false,
     val pikminBloomInstalled: Boolean = false,
     val yptInstalled: Boolean = false,
