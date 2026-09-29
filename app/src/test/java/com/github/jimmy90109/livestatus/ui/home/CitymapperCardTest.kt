@@ -55,10 +55,11 @@ class CitymapperCardTest {
                 CitymapperSimulation.METRO_RIDING,
                 CitymapperNavigationStage.RIDING,
                 CitymapperTransitMode.METRO,
-                stops = 4,
-                criticalText = "4站下車",
+                totalStops = 6,
+                remainingStops = 2,
+                criticalText = "2站下車",
                 iconRes = R.drawable.ic_metro_notification,
-                title = "乘坐 4 站",
+                title = "乘坐 6 站",
             ),
         )
 
@@ -70,7 +71,8 @@ class CitymapperCardTest {
             assertEquals(expected.mode, update.presentation.transitMode)
             assertEquals(expected.walkingMinutes, update.presentation.walkingMinutes)
             assertEquals(expected.timing, update.presentation.transitTiming)
-            assertEquals(expected.stops, update.presentation.stops)
+            assertEquals(expected.totalStops, update.presentation.totalStops)
+            assertEquals(expected.remainingStops, update.presentation.remainingStops)
             assertEquals(expected.title, update.text.title)
             assertTrue(update.text.contentText.isNotBlank())
             assertTrue(update.sourceKey.startsWith("citymapper-simulation-"))
@@ -91,7 +93,8 @@ class CitymapperCardTest {
         val mode: CitymapperTransitMode,
         val walkingMinutes: Int? = null,
         val timing: CitymapperTransitTiming? = null,
-        val stops: Int? = null,
+        val totalStops: Int? = null,
+        val remainingStops: Int? = null,
         val criticalText: String,
         val iconRes: Int,
         val title: String,

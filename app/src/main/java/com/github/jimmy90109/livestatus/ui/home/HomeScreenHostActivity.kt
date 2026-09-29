@@ -45,6 +45,7 @@ open class HomeScreenHostActivity : ComponentActivity() {
             ACTION_OPEN_TAIWAN_PAY -> openTaiwanPay()
             ACTION_OPEN_YOU_BIKE -> openYouBike()
             ACTION_OPEN_FOODPANDA -> openFoodpanda()
+            ACTION_OPEN_MCDONALDS -> openMcDonalds()
             ACTION_OPEN_TAIWAN_TAXI -> openTaiwanTaxi()
             ACTION_OPEN_UBER -> openUber()
             ACTION_OPEN_UBER_EATS -> openUberEats()
@@ -89,10 +90,13 @@ open class HomeScreenHostActivity : ComponentActivity() {
         val taiwanPayInstalled = isPackageInstalled(TAIWAN_PAY_PACKAGE)
         val youBikeInstalled = isPackageInstalled(YOU_BIKE_PACKAGE)
         val foodpandaInstalled = isPackageInstalled(FOODPANDA_PACKAGE)
+        val mcDonaldsInstalled = isPackageInstalled(MCDONALDS_PACKAGE)
         val taiwanTaxiInstalled = isPackageInstalled(TAIWAN_TAXI_PACKAGE)
         val uberInstalled = isPackageInstalled(UBER_PACKAGE)
         val boltInstalled = BuildConfig.DEBUG && isPackageInstalled(BOLT_PACKAGE)
         val citymapperInstalled = isPackageInstalled(CITYMAPPER_PACKAGE)
+        val taipeiMetroGoInstalled =
+            BuildConfig.DEBUG && isPackageInstalled(TAIPEI_METRO_GO_PACKAGE)
         val uberEatsInstalled = isPackageInstalled(UBER_EATS_PACKAGE)
         val pikminBloomInstalled = isPackageInstalled(PIKMIN_BLOOM_PACKAGE)
         val yptInstalled = isPackageInstalled(YPT_PACKAGE)
@@ -110,11 +114,13 @@ open class HomeScreenHostActivity : ComponentActivity() {
             taiwanPayInstalled = taiwanPayInstalled,
             youBikeInstalled = youBikeInstalled,
             foodpandaInstalled = foodpandaInstalled,
+            mcDonaldsInstalled = mcDonaldsInstalled,
             taiwanTaxiInstalled = taiwanTaxiInstalled,
             uberInstalled = uberInstalled,
             boltInstalled = boltInstalled,
             citymapperInstalled = citymapperInstalled,
             citymapperEnabled = AppReminderPreferences.App.CITYMAPPER.isEnabled(this, citymapperInstalled),
+            taipeiMetroGoInstalled = taipeiMetroGoInstalled,
             uberEatsInstalled = uberEatsInstalled,
             pikminBloomInstalled = pikminBloomInstalled,
             yptInstalled = yptInstalled,
@@ -126,6 +132,8 @@ open class HomeScreenHostActivity : ComponentActivity() {
             brandWarning = brandWarning,
             brandWarningDismissed =
                 AppReminderPreferences.isBrandWarningDismissed(this),
+            genericProgressEnabled =
+                AppReminderPreferences.App.GENERIC_PROGRESS.isEnabled(this),
             mediaPlaybackEnabled = AppReminderPreferences.App.MEDIA_PLAYBACK.isEnabled(this),
             clockEnabled = AppReminderPreferences.App.CLOCK.isEnabled(this, clockInstalled),
             ipassEnabled = AppReminderPreferences.App.IPASS.isEnabled(this, ipassInstalled),
@@ -135,6 +143,8 @@ open class HomeScreenHostActivity : ComponentActivity() {
                 AppReminderPreferences.App.YOUBIKE.isEnabled(this, youBikeInstalled),
             youBikeExactAlarmAllowed = YouBikeRideManager.canScheduleExactAlarms(this),
             foodpandaEnabled = AppReminderPreferences.App.FOODPANDA.isEnabled(this, foodpandaInstalled),
+            mcDonaldsEnabled =
+                AppReminderPreferences.App.MCDONALDS.isEnabled(this, mcDonaldsInstalled),
             taiwanTaxiEnabled =
                 AppReminderPreferences.App.TAIWAN_TAXI.isEnabled(this, taiwanTaxiInstalled),
             uberEnabled = AppReminderPreferences.App.UBER_RIDE.isEnabled(this, uberInstalled),
@@ -208,23 +218,8 @@ open class HomeScreenHostActivity : ComponentActivity() {
             .launchUrl(this, url.toUri())
     }
 
-    private fun isSamsungDevice(): Boolean =
-        Build.MANUFACTURER.equals("samsung", ignoreCase = true) ||
-            Build.BRAND.equals("samsung", ignoreCase = true)
-
-    private fun isXiaomiDevice(): Boolean =
-        isXiaomiFamily(Build.MANUFACTURER) || isXiaomiFamily(Build.BRAND)
-
-    private fun detectBrandWarning(): BrandWarning? = when {
-        isSamsungDevice() -> BrandWarning.SAMSUNG_NOW_BAR
-        isXiaomiDevice() -> BrandWarning.XIAOMI_HYPER_ISLAND
-        else -> null
-    }
-
-    private fun isXiaomiFamily(value: String?): Boolean {
-        val normalized = value?.lowercase()?.trim().orEmpty()
-        return normalized == "xiaomi" || normalized == "redmi" || normalized == "poco"
-    }
+    private fun detectBrandWarning(): BrandWarning? =
+        detectBrandWarning(Build.MANUFACTURER, Build.BRAND)
 
     private fun openIpass() = openPackage(IPASS_PACKAGE, "iPASS MONEY")
 
@@ -235,6 +230,8 @@ open class HomeScreenHostActivity : ComponentActivity() {
     private fun openYouBike() = openPackage(YOU_BIKE_PACKAGE, "YouBike")
 
     private fun openFoodpanda() = openPackage(FOODPANDA_PACKAGE, "foodpanda")
+
+    private fun openMcDonalds() = openPackage(MCDONALDS_PACKAGE, "McDonald's")
 
     private fun openTaiwanTaxi() = openPackage(TAIWAN_TAXI_PACKAGE, "55688")
 
@@ -277,12 +274,15 @@ open class HomeScreenHostActivity : ComponentActivity() {
 
     private fun clearReminder(app: AppReminderPreferences.App) {
         when (app) {
+            AppReminderPreferences.App.GENERIC_PROGRESS ->
+                LiveStatusReminder.clearAllGenericProgress(this)
             AppReminderPreferences.App.MEDIA_PLAYBACK -> LiveStatusReminder.clearMediaPlayback(this)
             AppReminderPreferences.App.CLOCK -> LiveStatusReminder.clearClockTimer(this)
             AppReminderPreferences.App.IPASS -> LiveStatusReminder.clear(this)
             AppReminderPreferences.App.TAIWAN_PAY -> LiveStatusReminder.clearTaiwanPay(this)
             AppReminderPreferences.App.YOUBIKE -> YouBikeRideManager.clear(this)
             AppReminderPreferences.App.FOODPANDA -> LiveStatusReminder.clearFoodpanda(this)
+            AppReminderPreferences.App.MCDONALDS -> LiveStatusReminder.clearMcDonalds(this)
             AppReminderPreferences.App.TAIWAN_TAXI -> TaiwanTaxiRideManager.clear(this)
             AppReminderPreferences.App.UBER_RIDE -> LiveStatusReminder.clearUberRide(this)
             AppReminderPreferences.App.UBER_EATS -> LiveStatusReminder.clearUberEats(this)
@@ -317,6 +317,8 @@ open class HomeScreenHostActivity : ComponentActivity() {
             "com.github.jimmy90109.livestatus.action.OPEN_YOUBIKE"
         private const val ACTION_OPEN_FOODPANDA =
             "com.github.jimmy90109.livestatus.action.OPEN_FOODPANDA"
+        private const val ACTION_OPEN_MCDONALDS =
+            "com.github.jimmy90109.livestatus.action.OPEN_MCDONALDS"
         private const val ACTION_OPEN_TAIWAN_TAXI =
             "com.github.jimmy90109.livestatus.action.OPEN_TAIWAN_TAXI"
         private const val ACTION_OPEN_UBER =
@@ -344,10 +346,12 @@ open class HomeScreenHostActivity : ComponentActivity() {
         private const val TAIWAN_PAY_PACKAGE = "tw.com.twmp.twhcewallet"
         private const val YOU_BIKE_PACKAGE = "tw.com.youbike.plus"
         private const val FOODPANDA_PACKAGE = "com.global.foodpanda.android"
+        private const val MCDONALDS_PACKAGE = "com.mcdonalds.mobileapp"
         private const val TAIWAN_TAXI_PACKAGE = "dbx.taiwantaxi"
         private const val UBER_PACKAGE = "com.ubercab"
         private const val BOLT_PACKAGE = "ee.mtakso.client"
         private const val CITYMAPPER_PACKAGE = "com.citymapper.app.release"
+        private const val TAIPEI_METRO_GO_PACKAGE = "tw.com.trtc.is.android05"
         private const val UBER_EATS_PACKAGE = "com.ubercab.eats"
         private const val PIKMIN_BLOOM_PACKAGE = "com.nianticlabs.pikmin"
         private const val YPT_PACKAGE = YptStudyNotificationParser.PACKAGE_NAME
@@ -380,6 +384,10 @@ open class HomeScreenHostActivity : ComponentActivity() {
         @JvmStatic
         fun createOpenFoodpandaIntent(context: Context): Intent =
             openAppIntent(context, ACTION_OPEN_FOODPANDA)
+
+        @JvmStatic
+        fun createOpenMcDonaldsIntent(context: Context): Intent =
+            openAppIntent(context, ACTION_OPEN_MCDONALDS)
 
         @JvmStatic
         fun createOpenTaiwanTaxiIntent(context: Context): Intent =
@@ -440,11 +448,13 @@ internal data class StatusSnapshot(
     val taiwanPayInstalled: Boolean = false,
     val youBikeInstalled: Boolean = false,
     val foodpandaInstalled: Boolean = false,
+    val mcDonaldsInstalled: Boolean = false,
     val taiwanTaxiInstalled: Boolean = false,
     val uberInstalled: Boolean = false,
     val boltInstalled: Boolean = false,
     val citymapperInstalled: Boolean = false,
     val citymapperEnabled: Boolean = false,
+    val taipeiMetroGoInstalled: Boolean = false,
     val uberEatsInstalled: Boolean = false,
     val pikminBloomInstalled: Boolean = false,
     val yptInstalled: Boolean = false,
@@ -455,6 +465,7 @@ internal data class StatusSnapshot(
     val googleRecorderInstalled: Boolean = false,
     val brandWarning: BrandWarning? = null,
     val brandWarningDismissed: Boolean = false,
+    val genericProgressEnabled: Boolean = false,
     val mediaPlaybackEnabled: Boolean = false,
     val clockEnabled: Boolean = false,
     val ipassEnabled: Boolean = false,
@@ -462,6 +473,7 @@ internal data class StatusSnapshot(
     val youBikeEnabled: Boolean = false,
     val youBikeExactAlarmAllowed: Boolean = false,
     val foodpandaEnabled: Boolean = false,
+    val mcDonaldsEnabled: Boolean = false,
     val taiwanTaxiEnabled: Boolean = false,
     val uberEnabled: Boolean = false,
     val uberEatsEnabled: Boolean = false,

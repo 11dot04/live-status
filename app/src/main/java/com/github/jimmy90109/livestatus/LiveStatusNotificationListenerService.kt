@@ -21,6 +21,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
     private val hevyWorkoutTracker = HevyWorkoutTracker()
     private val stravaRecordingTracker = StravaRecordingTracker()
     private val citymapperTracker = CitymapperNavigationTracker()
+    private val genericProgressTracker = GenericProgressTracker()
     private val citymapperPreferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == AppReminderPreferences.App.CITYMAPPER.preferenceKey) {
             if (AppReminderPreferences.App.CITYMAPPER.isEnabled(this)) {
@@ -30,6 +31,19 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             }
         }
     }
+    private val genericProgressPreferenceListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == AppReminderPreferences.App.GENERIC_PROGRESS.preferenceKey) {
+                if (AppReminderPreferences.App.GENERIC_PROGRESS.isEnabled(this)) {
+                    restoreGenericProgress(
+                        runCatching { activeNotifications }.getOrNull().orEmpty(),
+                    )
+                } else {
+                    genericProgressTracker.reset()
+                    LiveStatusReminder.clearAllGenericProgress(this)
+                }
+            }
+        }
     private val discordVoiceTracker = DiscordVoiceTracker()
     private val teamsCallTracker = TeamsCallTracker()
     private val recorderTracker = RecorderTracker()
@@ -53,10 +67,12 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
     private var lastUberRideUpdate =
         LiveStatusNotificationParser.UberRideUpdate(LiveStatusNotificationParser.UberRideEvent.NONE)
     private val uberEatsTracker = UberEatsTracker()
+    private val mcDonaldsTracker = McDonaldsTracker()
 
     override fun onCreate() {
         super.onCreate()
         AppReminderPreferences.registerListener(this, citymapperPreferenceListener)
+        AppReminderPreferences.registerListener(this, genericProgressPreferenceListener)
     }
 
     override fun onNotificationPosted(statusBarNotification: StatusBarNotification) {
@@ -88,6 +104,16 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 } else {
                     handleCitymapperDecision(citymapperTracker.reset())
                 }
+            }
+            TAIPEI_METRO_GO_PACKAGE -> if (BuildConfig.DEBUG) {
+                NotificationDebugPayloadStore.recordTaipeiMetroGo(
+                    this,
+                    statusBarNotification,
+                    notificationText,
+                    readNotificationTitle(notification),
+                    readNotificationContentText(notification),
+                    "POSTED",
+                )
             }
             BOLT_PACKAGE -> if (BuildConfig.DEBUG) {
                 NotificationDebugPayloadStore.recordBolt(
@@ -261,6 +287,40 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                     handleFoodpandaNotification(event)
                 }
             }
+            MCDONALDS_PACKAGE -> {
+                val notificationTitle = readNotificationTitle(notification)
+                val notificationContentText = readNotificationContentText(notification)
+                val update = if (notification.flags and Notification.FLAG_GROUP_SUMMARY == 0) {
+                    LiveStatusNotificationParser.parseMcDonalds(
+                        notificationTitle,
+                        notificationContentText,
+                        notificationText,
+                    )
+                } else {
+                    LiveStatusNotificationParser.McDonaldsUpdate(
+                        LiveStatusNotificationParser.McDonaldsEvent.NONE,
+                    )
+                }
+                if (BuildConfig.DEBUG) {
+                    NotificationDebugPayloadStore.recordMcDonalds(
+                        this,
+                        statusBarNotification,
+                        notificationText,
+                        notificationTitle,
+                        notificationContentText,
+                        "POSTED",
+                        update,
+                    )
+                }
+                if (AppReminderPreferences.App.MCDONALDS.isEnabled(this)) {
+                    handleMcDonaldsDecision(
+                        mcDonaldsTracker.onPosted(statusBarNotification.key, update),
+                    )
+                } else {
+                    mcDonaldsTracker.reset()
+                    LiveStatusReminder.clearMcDonalds(this)
+                }
+            }
             TAIWAN_TAXI_PACKAGE -> {
                 val notificationTitle = readNotificationTitle(notification)
                 val notificationContentText = readNotificationContentText(notification)
@@ -399,6 +459,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 }
             }
         }
+        handleGenericProgressPosted(statusBarNotification)
     }
 
     private fun parseHevyWorkout(
@@ -507,8 +568,29 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         )
     }
 
+    private fun recordTaipeiMetroGo(
+        statusBarNotification: StatusBarNotification,
+        lifecycle: String,
+    ) {
+        if (!BuildConfig.DEBUG) return
+        val notification = statusBarNotification.notification
+        NotificationDebugPayloadStore.recordTaipeiMetroGo(
+            this,
+            statusBarNotification,
+            readNotificationText(this, statusBarNotification.packageName, notification),
+            readNotificationTitle(notification),
+            readNotificationContentText(notification),
+            lifecycle,
+        )
+    }
+
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification) {
         mediaPlaybackMonitor.onNotificationRemoved(statusBarNotification)
+        if (statusBarNotification.packageName != packageName) {
+            handleGenericProgressDecision(
+                genericProgressTracker.onRemoved(statusBarNotification.key),
+            )
+        }
         if (statusBarNotification.packageName == CITYMAPPER_PACKAGE) {
             if (BuildConfig.DEBUG) {
                 val notification = statusBarNotification.notification
@@ -522,6 +604,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 )
             }
             handleCitymapperDecision(citymapperTracker.onRemoved(statusBarNotification.key))
+            return
+        }
+        if (BuildConfig.DEBUG && statusBarNotification.packageName == TAIPEI_METRO_GO_PACKAGE) {
+            recordTaipeiMetroGo(statusBarNotification, "REMOVED")
             return
         }
         if (BuildConfig.DEBUG && statusBarNotification.packageName == BOLT_PACKAGE) {
@@ -608,6 +694,24 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             handleUberEatsDecision(uberEatsTracker.onRemoved(statusBarNotification.key))
             return
         }
+        if (statusBarNotification.packageName == MCDONALDS_PACKAGE) {
+            if (BuildConfig.DEBUG) {
+                val notification = statusBarNotification.notification
+                NotificationDebugPayloadStore.recordMcDonalds(
+                    this,
+                    statusBarNotification,
+                    readNotificationText(this, statusBarNotification.packageName, notification),
+                    readNotificationTitle(notification),
+                    readNotificationContentText(notification),
+                    "REMOVED",
+                    LiveStatusNotificationParser.McDonaldsUpdate(
+                        LiveStatusNotificationParser.McDonaldsEvent.NONE,
+                    ),
+                )
+            }
+            handleMcDonaldsDecision(mcDonaldsTracker.onRemoved(statusBarNotification.key))
+            return
+        }
         if (statusBarNotification.packageName != PIKMIN_BLOOM_PACKAGE) return
 
         val notificationText = readNotificationText(statusBarNotification.notification)
@@ -621,7 +725,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
     override fun onDestroy() {
         AppReminderPreferences.unregisterListener(this, citymapperPreferenceListener)
+        AppReminderPreferences.unregisterListener(this, genericProgressPreferenceListener)
         handleCitymapperDecision(citymapperTracker.reset())
+        genericProgressTracker.reset()
+        LiveStatusReminder.clearAllGenericProgress(this)
         stopClockTimerRefresh()
         mediaPlaybackMonitor.stop()
         super.onDestroy()
@@ -648,6 +755,9 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 .filter { it.packageName == GOOGLE_RECORDER_PACKAGE }
                 .forEach { recordGoogleRecorder(it, "ACTIVE_SNAPSHOT") }
             activeNotifications
+                .filter { it.packageName == TAIPEI_METRO_GO_PACKAGE }
+                .forEach { recordTaipeiMetroGo(it, "ACTIVE_SNAPSHOT") }
+            activeNotifications
                 .filter { it.packageName == STRAVA_PACKAGE }
                 .forEach {
                     val notification = it.notification
@@ -673,11 +783,15 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         restoreHevyWorkout(activeNotifications)
         restoreStravaRecording(activeNotifications)
         restoreCitymapperNavigation(activeNotifications)
+        restoreMcDonaldsReadyOrder(activeNotifications)
+        restoreGenericProgress(activeNotifications)
         YouBikeRideManager.restore(this)
     }
 
     override fun onListenerDisconnected() {
         handleCitymapperDecision(citymapperTracker.reset())
+        genericProgressTracker.reset()
+        LiveStatusReminder.clearAllGenericProgress(this)
         mediaPlaybackMonitor.stop()
         super.onListenerDisconnected()
     }
@@ -693,6 +807,37 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             CitymapperNavigationDecision.Clear -> LiveStatusReminder.clearCitymapperNavigation(this)
             CitymapperNavigationDecision.None -> Unit
         }
+    }
+
+    private fun handleGenericProgressPosted(statusBarNotification: StatusBarNotification) {
+        val update = if (AppReminderPreferences.App.GENERIC_PROGRESS.isEnabled(this)) {
+            GenericProgressNotificationExtractor.extract(this, statusBarNotification)
+        } else {
+            null
+        }
+        handleGenericProgressDecision(
+            genericProgressTracker.onPosted(statusBarNotification.key, update),
+        )
+    }
+
+    private fun handleGenericProgressDecision(decision: GenericProgressDecision) {
+        when (decision) {
+            is GenericProgressDecision.Show ->
+                LiveStatusReminder.showGenericProgress(this, decision.update)
+            is GenericProgressDecision.Clear ->
+                LiveStatusReminder.clearGenericProgress(this, decision.sourceKey)
+        }
+    }
+
+    private fun restoreGenericProgress(notifications: Array<out StatusBarNotification>) {
+        genericProgressTracker.reset()
+        LiveStatusReminder.clearAllGenericProgress(this)
+        if (!AppReminderPreferences.App.GENERIC_PROGRESS.isEnabled(this)) return
+
+        val updates = notifications.mapNotNull {
+            GenericProgressNotificationExtractor.extract(this, it)
+        }
+        genericProgressTracker.restore(updates).forEach(::handleGenericProgressDecision)
     }
 
     private fun restoreCitymapperNavigation(notifications: Array<out StatusBarNotification>) {
@@ -963,6 +1108,48 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         }
     }
 
+    private fun handleMcDonaldsDecision(decision: McDonaldsDecision) {
+        when (decision) {
+            is McDonaldsDecision.Show -> LiveStatusReminder.showMcDonalds(this, decision.update)
+            McDonaldsDecision.Clear -> LiveStatusReminder.clearMcDonalds(this)
+            McDonaldsDecision.None -> Unit
+        }
+    }
+
+    private fun restoreMcDonaldsReadyOrder(
+        notifications: Array<out StatusBarNotification>,
+    ) {
+        if (!AppReminderPreferences.App.MCDONALDS.isEnabled(this)) {
+            mcDonaldsTracker.reset()
+            LiveStatusReminder.clearMcDonalds(this)
+            return
+        }
+
+        val latest = notifications
+            .asSequence()
+            .filter { it.packageName == MCDONALDS_PACKAGE }
+            .filter { it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 }
+            .mapNotNull { source ->
+                val notification = source.notification
+                val update = LiveStatusNotificationParser.parseMcDonalds(
+                    readNotificationTitle(notification),
+                    readNotificationContentText(notification),
+                    readNotificationText(this, source.packageName, notification),
+                )
+                source.takeIf {
+                    update.event == LiveStatusNotificationParser.McDonaldsEvent.READY_FOR_PICKUP
+                }?.let { Triple(source.postTime, source.key, update) }
+            }
+            .maxByOrNull { it.first }
+
+        if (latest == null) {
+            mcDonaldsTracker.reset()
+            LiveStatusReminder.clearMcDonalds(this)
+        } else {
+            handleMcDonaldsDecision(mcDonaldsTracker.onPosted(latest.second, latest.third))
+        }
+    }
+
     private fun handleUberRideNotification(update: LiveStatusNotificationParser.UberRideUpdate) {
         if (update.event == LiveStatusNotificationParser.UberRideEvent.TRIP_ENDED) {
             resetUberRideState()
@@ -1049,8 +1236,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         private const val TAIWAN_PAY_PACKAGE = "tw.com.twmp.twhcewallet"
         private const val YOU_BIKE_PACKAGE = "tw.com.youbike.plus"
         private const val FOODPANDA_PACKAGE = "com.global.foodpanda.android"
+        private const val MCDONALDS_PACKAGE = "com.mcdonalds.mobileapp"
         private const val TAIWAN_TAXI_PACKAGE = "dbx.taiwantaxi"
         private const val CITYMAPPER_PACKAGE = CitymapperNavigationMapper.PACKAGE_NAME
+        private const val TAIPEI_METRO_GO_PACKAGE = "tw.com.trtc.is.android05"
         private const val BOLT_PACKAGE = "ee.mtakso.client"
         private const val UBER_RIDE_PACKAGE = "com.ubercab"
         private const val UBER_EATS_PACKAGE = "com.ubercab.eats"

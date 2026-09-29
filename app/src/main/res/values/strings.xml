@@ -28,6 +28,8 @@
     <string name="xiaomi_hyperos_warning_floating_notification">若通知已出現但膠囊沒有出現，允許浮動或焦點通知。</string>
     <string name="xiaomi_hyperos_warning_footer">不同 HyperOS 版本與地區的選單名稱可能略有差異；下方按鈕會開啟本 App 的系統設定頁。</string>
     <string name="xiaomi_open_app_settings">開啟 App 設定  →</string>
+    <string name="asus_live_updates_warning_title">⚠ ASUS 系統尚未支援完整 Live Updates</string>
+    <string name="asus_live_updates_warning_description">目前已知部分 ASUS Android 16 韌體不會將第三方通知提升為狀態列膠囊或鎖定畫面即時動態；提醒仍可作為一般持續通知使用，實際顯示可能隨系統更新改變。</string>
     <string name="app_card_collapsed">試用選項已收起</string>
     <string name="app_card_expanded">試用選項已展開</string>
     <string name="app_card_expand">試用即時通知功能</string>
@@ -37,7 +39,7 @@
     <string name="app_category_navigation">導航</string>
     <string name="citymapper_app_name">Citymapper</string>
     <string name="citymapper_card_title">導航即時通知</string>
-    <string name="citymapper_card_description">同步顯示 Citymapper 導航內文與抵達時間，依台灣通勤階段、候車倒數或發車時刻切換膠囊短文與圖示；保留可用導航操作、不提供分享。點擊提醒回到 Citymapper，來源通知移除後自動清除。</string>
+    <string name="citymapper_card_description">同步顯示 Citymapper 導航內文與抵達時間，依台灣通勤階段、候車倒數、發車時刻或剩餘站數切換膠囊短文與圖示；保留可用導航操作、不提供分享。點擊提醒回到 Citymapper，來源通知移除後自動清除。</string>
     <string name="citymapper_source_language">繁中</string>
     <string name="citymapper_live_critical_text">導航</string>
     <string name="citymapper_live_walking_minutes">%1$d分步行</string>
@@ -49,7 +51,7 @@
     <string name="citymapper_live_metro_minutes">%1$d分捷運</string>
     <string name="citymapper_live_waiting_metro">等捷運</string>
     <string name="citymapper_live_unknown_minutes">%1$d分到站</string>
-    <string name="citymapper_live_stops">%1$d站下車</string>
+    <string name="citymapper_live_remaining_stops">%1$d站下車</string>
     <string name="citymapper_live_train_departure">%1$s發車</string>
     <string name="citymapper_arrival_time_format">預計抵達時間：%1$s到達</string>
     <string name="citymapper_notification_channel_name">Citymapper 導航</string>
@@ -68,10 +70,15 @@
     <string name="citymapper_simulate_train_departure_supporting">膠囊：2:03發車 · 台鐵圖示</string>
     <string name="citymapper_simulate_metro_waiting">模擬等候捷運</string>
     <string name="citymapper_simulate_metro_waiting_supporting">膠囊：3分捷運 · 捷運圖示</string>
-    <string name="citymapper_simulate_metro_riding">模擬搭乘捷運 4 站</string>
-    <string name="citymapper_simulate_metro_riding_supporting">膠囊：4站下車 · 捷運圖示</string>
+    <string name="citymapper_simulate_metro_riding">模擬搭乘捷運（總共 6 站／還有 2 站）</string>
+    <string name="citymapper_simulate_metro_riding_supporting">膠囊：2站下車 · 捷運圖示</string>
     <string name="citymapper_simulate_clear">清除 Citymapper 狀態</string>
     <string name="citymapper_simulate_clear_supporting">移除目前模擬或來源映射的提醒</string>
+    <string name="taipei_metro_go_app_name">台北捷運 GO</string>
+    <string name="taipei_metro_go_debug_card_title">下車提醒 payload 收集</string>
+    <string name="taipei_metro_go_debug_card_description">Debug build 暫存最近 30 筆台北捷運 GO 通知、移除事件與連線時既有通知，供後續分析下車提醒格式；重新啟動 App 後即清除。</string>
+    <string name="taipei_metro_go_debug_language">待分析</string>
+    <string name="taipei_metro_go_debug_open_payload">查看通知 payload</string>
     <string name="bolt_app_name">Bolt</string>
     <string name="bolt_debug_card_title">叫車通知 payload 收集</string>
     <string name="bolt_debug_card_description">Debug build 暫存最近 30 筆 Bolt 通知與移除事件，供後續分析通知格式；重新啟動 App 後即清除。</string>
@@ -90,6 +97,11 @@
     <string name="media_playback_language_independent">不依賴語言</string>
     <string name="media_playback_limitation_title">優先使用系統原生媒體介面</string>
     <string name="media_playback_limitation_description">Pixel 預設開啟；Samsung、小米及其他 OEM 通常已有媒體即時介面，因此預設關閉，但仍可手動開啟。手動設定後會保留您的選擇。</string>
+    <string name="generic_progress_card_app_name">所有 App</string>
+    <string name="generic_progress_card_title">進度通知</string>
+    <string name="generic_progress_card_description">將其他 App 的確定進度條同步成 Live Update，保留點擊操作與最多三個來源按鈕。來源已由系統或專用功能顯示時不會重複建立。</string>
+    <string name="generic_progress_notification_channel_name">進度通知即時狀態</string>
+    <string name="generic_progress_notification_channel_description">靜音顯示其他 App 的確定進度，不播放提示音或震動。</string>
     <string name="discord_debug_open_payload">查看 Discord payload</string>
     <string name="discord_voice_card_title">語音通話</string>
     <string name="discord_voice_card_description">接通 Discord 私人通話或加入伺服器語音頻道後，顯示來源連線狀態、對方／頻道名稱與通話操作；掛斷或離開時自動移除。</string>
@@ -254,6 +266,8 @@
     <string name="monitoring_foodpanda_on_the_way">包含「外送夥伴在路上」。</string>
     <string name="monitoring_foodpanda_arriving">包含「外送夥伴即將抵達」。</string>
     <string name="monitoring_foodpanda_ended">包含「已送達」、「訂單完成」、「已取消」或「訂單取消」。</string>
+    <string name="mcdonalds_supported_notification_notice">目前僅支援繁中「訂單準備就緒」且請直接至餐廳取餐的通知；其他取餐方式與特殊狀態請以麥當勞 App 為準。</string>
+    <string name="monitoring_mcdonalds_ready">標題為「訂單準備就緒」，內文符合「您的訂單 [號碼] 已完成，請直接至餐廳取餐」。</string>
 
     <string name="monitoring_uber_pickup_en_route">標題為「[分鐘] 分鐘內上車」，且通知文字包含「在 [上車點] 碰面」。</string>
     <string name="monitoring_uber_pickup_nearby">標題為「[司機] 即將抵達」；或在 2 分鐘內上車且已取得車牌、車款或 PIN。</string>

@@ -171,12 +171,13 @@ internal enum class CitymapperSimulation {
             ),
         )
         METRO_RIDING -> update(
-            title = "乘坐 4 站",
-            contentText = "市政府-Taipei City Hall\n預計抵達時間：下午3:30到達",
+            title = "乘坐 6 站",
+            contentText = "(還有 2 站)\n市政府-Taipei City Hall\n預計抵達時間：下午3:30到達",
             presentation = CitymapperNavigationPresentation(
                 stage = CitymapperNavigationStage.RIDING,
                 transitMode = CitymapperTransitMode.METRO,
-                stops = 4,
+                totalStops = 6,
+                remainingStops = 2,
             ),
         )
     }

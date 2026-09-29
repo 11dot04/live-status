@@ -26,6 +26,7 @@ object LiveStatusReminder {
     internal const val GOOGLE_RECORDER_VISIBILITY = Notification.VISIBILITY_PUBLIC
     private const val CHANNEL_ID = "live_status"
     private const val MEDIA_CHANNEL_ID = "media_live_status"
+    private const val GENERIC_PROGRESS_CHANNEL_ID = "generic_progress_live_status_v1"
     private const val DISCORD_VOICE_CHANNEL_ID = "discord_voice_live_status_v2"
     private const val LEGACY_DISCORD_VOICE_CHANNEL_ID = "discord_voice_live_status"
     private const val TEAMS_CALL_CHANNEL_ID = "teams_call_live_status_v1"
@@ -48,6 +49,8 @@ object LiveStatusReminder {
     private const val TEAMS_CALL_NOTIFICATION_ID = 1015
     private const val STRAVA_RECORDING_NOTIFICATION_ID = 1016
     private const val CITYMAPPER_NOTIFICATION_ID = 1017
+    private const val MCDONALDS_NOTIFICATION_ID = 1018
+    private const val GENERIC_PROGRESS_NOTIFICATION_ID = 1019
     private const val CITYMAPPER_CHANNEL_ID = "citymapper_navigation"
     private const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
     private val uberEatsArrivalEstimate = Regex(
@@ -76,6 +79,20 @@ object LiveStatusReminder {
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
             description = context.getString(R.string.media_notification_channel_description)
+            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            setSound(null, null)
+            enableVibration(false)
+        }
+        notificationManager(context).createNotificationChannel(channel)
+    }
+
+    private fun createGenericProgressChannel(context: Context) {
+        val channel = NotificationChannel(
+            GENERIC_PROGRESS_CHANNEL_ID,
+            context.getString(R.string.generic_progress_notification_channel_name),
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = context.getString(R.string.generic_progress_notification_channel_description)
             lockscreenVisibility = Notification.VISIBILITY_PRIVATE
             setSound(null, null)
             enableVibration(false)
@@ -257,6 +274,49 @@ object LiveStatusReminder {
     @JvmStatic
     fun clearFoodpanda(context: Context) {
         notificationManager(context).cancel(FOODPANDA_NOTIFICATION_ID)
+    }
+
+    @JvmStatic
+    fun showMcDonalds(
+        context: Context,
+        update: LiveStatusNotificationParser.McDonaldsUpdate,
+    ) {
+        val orderNumber = update.orderNumber?.takeIf(String::isNotBlank) ?: return
+        createChannel(context)
+        val openMcDonalds = PendingIntent.getActivity(
+            context,
+            18,
+            HomeScreenHostActivity.createOpenMcDonaldsIntent(context),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val payload = mcDonaldsPayload(orderNumber, openMcDonalds)
+        val builder = Notification.Builder(context, CHANNEL_ID)
+            .setSmallIcon(payload.smallIconRes)
+            .setContentTitle(payload.title)
+            .setContentText(payload.contentText)
+            .setContentIntent(payload.contentIntent)
+            .addAction(
+                Notification.Action.Builder(
+                    Icon.createWithResource(context, payload.leftIconRes),
+                    "開啟 McDonald's",
+                    openMcDonalds,
+                ).build(),
+            )
+            .setCategory(Notification.CATEGORY_STATUS)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setStyle(Notification.BigTextStyle().bigText(payload.contentText))
+            .setShortCriticalText(payload.criticalText)
+            .also(::requestPromotedOngoing)
+            .also { XiaomiHyperIslandRenderer.apply(context, it, payload) }
+
+        notificationManager(context).notify(MCDONALDS_NOTIFICATION_ID, builder.build())
+    }
+
+    @JvmStatic
+    fun clearMcDonalds(context: Context) {
+        notificationManager(context).cancel(MCDONALDS_NOTIFICATION_ID)
     }
 
     @JvmStatic
@@ -740,8 +800,8 @@ object LiveStatusReminder {
             context.getString(R.string.citymapper_live_walking_minutes, it)
         } ?: context.getString(R.string.citymapper_live_walking)
         CitymapperNavigationStage.WAITING -> citymapperWaitingCriticalText(context, presentation)
-        CitymapperNavigationStage.RIDING -> presentation.stops?.let {
-            context.getString(R.string.citymapper_live_stops, it)
+        CitymapperNavigationStage.RIDING -> presentation.remainingStops?.let {
+            context.getString(R.string.citymapper_live_remaining_stops, it)
         } ?: context.getString(R.string.citymapper_live_critical_text)
         CitymapperNavigationStage.TRAIN_DEPARTURE ->
             (presentation.transitTiming as? CitymapperTransitTiming.ScheduledTime)?.let {
@@ -1005,6 +1065,57 @@ object LiveStatusReminder {
             .setAuthenticationRequired(sourceAction.isAuthenticationRequired)
         sourceAction.remoteInputs.orEmpty().forEach(builder::addRemoteInput)
         return builder.build()
+    }
+
+    internal fun showGenericProgress(context: Context, update: GenericProgressUpdate) {
+        createGenericProgressChannel(context)
+        val progressStyle = Notification.ProgressStyle()
+            .setStyledByProgress(true)
+            .setProgress(update.progressPercent)
+            .addProgressSegment(
+                Notification.ProgressStyle.Segment(100).setId(1),
+            )
+        val builder = Notification.Builder(context, GENERIC_PROGRESS_CHANNEL_ID)
+            .setSmallIcon(
+                update.smallIcon
+                    ?: Icon.createWithResource(context, R.drawable.ic_notification),
+            )
+            .setContentTitle(update.title)
+            .setSubText(update.sourceAppName)
+            .setCategory(Notification.CATEGORY_PROGRESS)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setVisibility(update.visibility.normalizedNotificationVisibility())
+            .setColorized(false)
+            .setShortCriticalText("${update.progressPercent}%")
+            .setStyle(progressStyle)
+            .also(::requestPromotedOngoing)
+        update.contentText?.let(builder::setContentText)
+        update.contentIntent?.let(builder::setContentIntent)
+        update.largeIcon?.let(builder::setLargeIcon)
+        update.sourceActions.forEach(builder::addAction)
+
+        notificationManager(context).notify(
+            GenericProgressNotificationIdentity.tag(update.sourceKey),
+            GENERIC_PROGRESS_NOTIFICATION_ID,
+            builder.build(),
+        )
+    }
+
+    internal fun clearGenericProgress(context: Context, sourceKey: String) {
+        notificationManager(context).cancel(
+            GenericProgressNotificationIdentity.tag(sourceKey),
+            GENERIC_PROGRESS_NOTIFICATION_ID,
+        )
+    }
+
+    internal fun clearAllGenericProgress(context: Context) {
+        notificationManager(context).activeNotifications
+            .filter {
+                it.id == GENERIC_PROGRESS_NOTIFICATION_ID &&
+                    GenericProgressNotificationIdentity.isGenericProgressTag(it.tag)
+            }
+            .forEach { notificationManager(context).cancel(it.tag, it.id) }
     }
 
     @JvmStatic
@@ -1431,6 +1542,20 @@ object LiveStatusReminder {
             contentIntent = contentIntent,
         )
     }
+
+    internal fun mcDonaldsPayload(
+        orderNumber: String,
+        contentIntent: PendingIntent? = null,
+    ): LiveStatusPayload = LiveStatusPayload(
+        id = MCDONALDS_NOTIFICATION_ID,
+        appName = "McDonald's",
+        smallIconRes = R.drawable.ic_food_delivery_notification,
+        leftIconRes = R.drawable.ic_food_delivery_notification,
+        criticalText = orderNumber,
+        title = "訂單準備就緒",
+        contentText = "訂單 $orderNumber 已完成，請直接至餐廳取餐。",
+        contentIntent = contentIntent,
+    )
 
     internal fun uberEatsPayload(
         event: LiveStatusNotificationParser.UberEatsEvent,

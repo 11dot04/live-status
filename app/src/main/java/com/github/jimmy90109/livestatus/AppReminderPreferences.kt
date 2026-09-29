@@ -16,12 +16,14 @@ object AppReminderPreferences {
     private const val BRAND_WARNING_DISMISSED = "brand_warning_dismissed"
 
     enum class App(internal val preferenceKey: String) {
+        GENERIC_PROGRESS("generic_progress_enabled"),
         MEDIA_PLAYBACK("media_playback_enabled"),
         CLOCK("clock_enabled"),
         IPASS("ipass_enabled"),
         TAIWAN_PAY("taiwan_pay_enabled"),
         YOUBIKE("you_bike_enabled"),
         FOODPANDA("foodpanda_enabled"),
+        MCDONALDS("mcdonalds_enabled"),
         TAIWAN_TAXI("taiwan_taxi_enabled"),
         UBER_RIDE("uber_ride_enabled"),
         UBER_EATS("uber_eats_enabled"),

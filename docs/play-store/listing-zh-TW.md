@@ -6,13 +6,16 @@ LiveStatus 即時狀態提醒
 
 ## 簡短說明
 
-將媒體、Discord／Teams 通話、倒數、錄音、健身、乘車與外送通知轉成 Android Live Update。
+將進度、媒體、通話、倒數、錄音、健身、乘車與外送通知轉成 Android Live Update。
 
 ## 完整說明
 
-LiveStatus 即時狀態提醒是一款為 Android 16 設計的通知輔助工具，會監聽媒體播放與指定應用程式的通知，將重要狀態轉換成持續顯示的 Live Update，讓你不用反覆打開 App，也能快速掌握正在播放內容、Discord 語音頻道、Microsoft Teams 通話、倒數計時、讀書與健身、外送、乘車與種花狀態。
+LiveStatus 即時狀態提醒是一款為 Android 16 設計的通知輔助工具，會監聽所有 App 的確定進度通知、媒體播放與指定應用程式的通知，將重要狀態轉換成持續顯示的 Live Update，讓你不用反覆打開 App，也能快速掌握下載等工作進度、正在播放內容、Discord 語音頻道、Microsoft Teams 通話、倒數計時、讀書與健身、外送、乘車與種花狀態。
 
-支援情境包含所有提供 Android MediaSession 與媒體通知的 App，以及 Discord 伺服器語音頻道、Microsoft Teams 進行中會議、Google 時鐘、Google Recorder、YPT、Hevy、Strava、Citymapper、iPASS MONEY、台灣 Pay、YouBike、foodpanda、55688、Uber、Uber Eats 與 Pikmin Bloom。
+支援情境包含所有提供 Android MediaSession 與媒體通知的 App，以及 Discord 伺服器語音頻道、Microsoft Teams 進行中會議、Google 時鐘、Google Recorder、YPT、Hevy、Strava、Citymapper、iPASS MONEY、台灣 Pay、YouBike、foodpanda、McDonald's、55688、Uber、Uber Eats 與 Pikmin Bloom。
+
+【進度通知】
+所有 App 提供有效且可計算百分比的確定進度條時，LiveStatus 會同步來源 App、標題、內文、點擊行為與最多三個操作，並允許多項工作同時顯示。來源已由系統原生提升、由本 App 的媒體或專用功能接管、屬於群組摘要或只提供不確定進度時不會重複建立。來源更新、完成並移除或不再符合時會同步更新或清除。功能預設開啟，可在工具分頁關閉。
 
 【媒體播放】
 當系統首選的活躍媒體工作階段正在播放、但來源通知尚未成為 Live Update 時，LiveStatus 會另外顯示曲名、作者、專輯與可用的切歌、播放、暫停或 podcast 倒退／快轉 15 秒控制。暫停後保留 1 分鐘方便恢復播放；停止、播放錯誤、工作階段或來源通知消失後會立即清除。Android 不允許修改其他 App 的通知，因此原始媒體通知仍會保留；備援通知是否被系統提升則依裝置支援情況而定。
@@ -53,6 +56,9 @@ Strava 記錄活動時，LiveStatus 會沿用官方通知標題顯示運動類�
 【foodpanda】
 當外送夥伴出發時，LiveStatus 會顯示外送中狀態；當外送夥伴接近時，會更新為即將抵達。訂單送達或取消後，提醒會自動移除。
 
+【McDonald's】
+當繁中通知顯示「訂單準備就緒」與「請直接至餐廳取餐」時，LiveStatus 會將訂單號碼顯示在 Live Update；對應來源通知移除時結束提醒。目前僅支援這個已驗證的直接至餐廳取餐文案，其他取餐方式請以官方 App 為準。
+
 【55688】
 司機接單後顯示車牌與抵達提醒，車輛抵達上車點時更新狀態，行程完成後自動移除。車牌只在裝置上即時處理，不會上傳或永久儲存。
 
@@ -78,6 +84,7 @@ LiveStatus 可依照通知內容顯示 Uber Eats 訂單進度，包含：
 
 【主要特色】
 ・將重要通知轉換成 Android 16 Live Update
+・同步所有 App 提供的確定進度條，支援多項進度同時顯示
 ・支援媒體播放、Discord 語音頻道、Microsoft Teams 通話、倒數與 Google Recorder 錄音計時、YPT 讀書、Hevy／Strava 運動、Citymapper 導航、外送、乘車碼、YouBike 費用、55688／Uber 乘車與 Pikmin Bloom 種花狀態提醒
 ・狀態結束後自動移除提醒
 ・點擊提醒可快速開啟對應 App
@@ -86,7 +93,7 @@ LiveStatus 可依照通知內容顯示 Uber Eats 訂單進度，包含：
 ・不會修改第三方 App 內容
 
 【權限說明】
-LiveStatus 需要通知存取權，才能讀取媒體工作階段與指定 App 的通知內容並轉換成即時狀態提醒。Discord 語音頻道與 Microsoft Teams 通話功能預設開啟，可在媒體分頁單獨關閉。媒體功能在 Google／Pixel 預設開啟；Samsung、小米及其他 OEM 因通常已有系統媒體即時介面而預設關閉，仍可在媒體分頁手動開啟，且會保留使用者選擇。YPT 讀書功能可在工具分頁單獨關閉，Hevy 健身功能可在運動分頁單獨關閉。YouBike 可選擇允許「鬧鐘與提醒」，只用於在費用變更邊界重新計算本機通知；不會顯示鬧鐘、播放聲音、連網或執行背景同步。所有解析都在裝置上進行，App 不會登入你的媒體、通訊、外送、支付、乘車、讀書、健身或遊戲帳號，也不會替你操作第三方服務。
+LiveStatus 需要通知存取權，才能讀取確定進度、媒體工作階段與指定 App 的通知內容並轉換成即時狀態提醒。通用進度功能預設開啟，可在工具分頁單獨關閉。Discord 語音頻道與 Microsoft Teams 通話功能預設開啟，可在媒體分頁單獨關閉。媒體功能在 Google／Pixel 預設開啟；Samsung、小米及其他 OEM 因通常已有媒體即時介面而預設關閉，仍可在媒體分頁手動開啟，且會保留使用者選擇。YPT 讀書功能可在工具分頁單獨關閉，Hevy 健身功能可在運動分頁單獨關閉。YouBike 可選擇允許「鬧鐘與提醒」，只用於在費用變更邊界重新計算本機通知；不會顯示鬧鐘、播放聲音、連網或執行背景同步。所有解析都在裝置上進行，App 不會登入你的媒體、通訊、外送、支付、乘車、讀書、健身或遊戲帳號，也不會替你操作第三方服務。
 
 【隱私優先】
 ・所有通知辨識都只在你的裝置上進行
@@ -96,10 +103,10 @@ LiveStatus 需要通知存取權，才能讀取媒體工作階段與指定 App �
 ・可可靠辨識時，PIN 會顯示在即時狀態提醒中
 ・你可以隨時在 Android 系統設定關閉通知存取
 
-系統需求：Android 16 或更新版本。Live Update 顯示方式依裝置支援情況而定。
+系統需求：Android 16 或更新版本。Live Update 顯示方式依裝置支援情況而定；目前已知部分 ASUS Android 16 韌體可能只顯示一般持續通知，不會顯示狀態列膠囊或鎖定畫面即時動態。
 
 【注意事項】
-LiveStatus 是第三方通知輔助工具，並非 Discord、Microsoft Teams、Google 時鐘、Google Recorder、YPT、Hevy、Strava、Citymapper、iPASS MONEY、台灣 Pay、YouBike、foodpanda、55688、Uber、Uber Eats 或 Pikmin Bloom 官方 App。第三方 App 的通知格式可能因版本、地區、語言或系統設定而有所不同，因此部分狀態可能無法顯示或即時更新。
+LiveStatus 是第三方通知輔助工具，並非 Discord、Microsoft Teams、Google 時鐘、Google Recorder、YPT、Hevy、Strava、Citymapper、iPASS MONEY、台灣 Pay、YouBike、foodpanda、McDonald's、55688、Uber、Uber Eats 或 Pikmin Bloom 官方 App。第三方 App 的通知格式可能因版本、地區、語言或系統設定而有所不同，因此部分狀態可能無法顯示或即時更新。
 
 LiveStatus 會盡量只顯示可可靠辨識的資訊。若通知內容不足或格式不明確，App 可能不會顯示部分資訊，以避免誤判。
 
@@ -115,12 +122,12 @@ LiveStatus 會盡量只顯示可可靠辨識的資訊。若通知內容不足或
 
 ## 發布版本名稱
 
-1.0.10
+1.1.0
 
 ## 發布說明
 
-1.0.10 更新：
+1.1.0 更新：
 
-- 新增 Citymapper 導航 Live Update，支援步行、公車、台鐵與捷運等繁中導航通知。
-- Uber Eats 僅在外送快抵達時於膠囊顯示 PIN，其他階段改為顯示訂單狀態。
-- 更新 Citymapper 卡片介面，移除 Beta 標籤。
+- 新增通用進度 Live Update，支援同步所有 App 的確定進度、標題、內文與操作。
+- 改善 Citymapper 台鐵候車與剩餘站數辨識，讓大眾運輸狀態更準確。
+- 新增 ASUS／ROG 裝置相容性提示，協助辨識系統僅顯示一般持續通知的情況。

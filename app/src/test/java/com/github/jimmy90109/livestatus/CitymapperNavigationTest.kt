@@ -68,8 +68,12 @@ class CitymapperNavigationTest {
             presentation("等候 107 或 107 或 201 或 202 (基隆漁會-Keelung Fishmens Association)\n11, 12, 18分鐘\n下午3:11 (96分鐘)到達"),
         )
         assertEquals(
-            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, stops = 6),
-            presentation("乘坐 6 站\n基隆轉運站-Keelung Transit Station\n下午3:11 (95分鐘)到達"),
+            CitymapperNavigationPresentation(
+                CitymapperNavigationStage.RIDING,
+                totalStops = 6,
+                remainingStops = 2,
+            ),
+            presentation("乘坐 6 站\n(還有 2 站)\n基隆轉運站-Keelung Transit Station\n下午3:11 (95分鐘)到達"),
         )
         assertEquals(
             CitymapperNavigationPresentation(
@@ -80,7 +84,7 @@ class CitymapperNavigationTest {
             presentation("14:18 1201 新竹-Hsinchu\n下午3:11 (95分鐘)到達"),
         )
         assertEquals(
-            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, stops = 8),
+            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, totalStops = 8),
             presentation("乘坐 8 站\n南港-Nangang\n下午3:11 (94分鐘)到達"),
         )
         assertEquals(
@@ -92,8 +96,48 @@ class CitymapperNavigationTest {
             presentation("等候 BL (往亞東醫院 Taipei Nangang Exhibition To Far Eastern Hospital)\n3, 8, 16分鐘\n下午3:11 (94分鐘)到達"),
         )
         assertEquals(
-            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, stops = 4),
+            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, totalStops = 4),
             presentation("乘坐 4 站\n市政府-Taipei City Hall\n下午3:11 (93分鐘)到達"),
+        )
+    }
+
+    @Test
+    fun parsesOnlyValidObservedRemainingStopsForRiding() {
+        for (line in listOf("(還有 2 站)", "（還有2站）", "(  還有   2   站  )")) {
+            assertEquals(
+                CitymapperNavigationPresentation(
+                    CitymapperNavigationStage.RIDING,
+                    totalStops = 6,
+                    remainingStops = 2,
+                ),
+                presentation("乘坐 6 站\n$line\n基隆轉運站"),
+            )
+        }
+
+        for (line in listOf(
+            "(還有兩站)",
+            "(還有 2 分鐘)",
+            "還有 2 站",
+            "(還有 0 站)",
+            "(還有 7 站)",
+            "(2 站)",
+        )) {
+            assertEquals(
+                line,
+                CitymapperNavigationPresentation(
+                    CitymapperNavigationStage.RIDING,
+                    totalStops = 6,
+                ),
+                presentation("乘坐 6 站\n$line\n基隆轉運站"),
+            )
+        }
+        assertEquals(
+            CitymapperNavigationPresentation(CitymapperNavigationStage.RIDING, totalStops = 6),
+            presentation("乘坐 6 站\n基隆轉運站"),
+        )
+        assertEquals(
+            CitymapperNavigationPresentation(CitymapperNavigationStage.WALKING),
+            presentation("步行至公車站\n(還有 2 站)"),
         )
     }
 
@@ -109,6 +153,44 @@ class CitymapperNavigationTest {
                 "等候 107 或 107 或 201 或 202 或 203 或 204 (基隆漁會-Keelung District Fishmens Association)\n" +
                     "下午2:03, 下午2:04\n下午3:30 (90分鐘)到達\n分享預計抵達時間",
             ),
+        )
+    }
+
+    @Test
+    fun classifiesObservedTrainWaitingWithoutDepartureTime() {
+        val source =
+            "1207 苗栗-Miaoli (北湖-Beihu | 嘉義-Chiayi | 苗栗-Miaoli)\n" +
+                "11, 25, 57分鐘\n預計抵達時間：下午3:25到達"
+        val presentation = presentation(source)
+
+        assertEquals(
+            CitymapperNavigationPresentation(
+                CitymapperNavigationStage.WAITING,
+                CitymapperTransitMode.TRAIN,
+                transitTiming = countdown(11),
+            ),
+            presentation,
+        )
+        assertEquals(R.drawable.ic_train_notification, LiveStatusReminder.citymapperIcon(presentation))
+    }
+
+    @Test
+    fun trainWaitingRequiresRoutePathAndValidCountdown() {
+        for (text in listOf(
+            "1207 苗栗-Miaoli\n11, 25, 57分鐘",
+            "1207 苗栗-Miaoli (北湖-Beihu | 嘉義-Chiayi | 苗栗-Miaoli)\n即將抵達",
+            "1207 苗栗-Miaoli (北湖-Beihu | 嘉義-Chiayi | 苗栗-Miaoli)\n11, soon分鐘",
+        )) {
+            assertEquals(text, CitymapperNavigationPresentation(), presentation(text))
+        }
+
+        assertEquals(
+            CitymapperTransitMode.BUS,
+            presentation("等候 1207 (示例站)\n11, 25, 57分鐘").transitMode,
+        )
+        assertEquals(
+            CitymapperNavigationStage.TRAIN_DEPARTURE,
+            presentation("14:18 1201 新竹-Hsinchu\n下午3:11 (95分鐘)到達").stage,
         )
     }
 
@@ -274,6 +356,8 @@ class CitymapperNavigationTest {
         assertEquals(CitymapperTransitMode.BUS, bus.update.presentation.transitMode)
         val busRide = tracker.onPosted("trip", update("trip", 2, presentation = riding(6))) as CitymapperNavigationDecision.Show
         assertEquals(CitymapperTransitMode.BUS, busRide.update.presentation.transitMode)
+        assertEquals(6, busRide.update.presentation.totalStops)
+        assertEquals(2, busRide.update.presentation.remainingStops)
 
         tracker.onPosted("trip", update("trip", 3, presentation = trainDeparture()))
         val trainRide = tracker.onPosted("trip", update("trip", 4, presentation = riding(8))) as CitymapperNavigationDecision.Show
@@ -295,6 +379,23 @@ class CitymapperNavigationTest {
         tracker.onPosted("trip", update("trip", 12, presentation = waiting(CitymapperTransitMode.UNKNOWN)))
         val afterUnknownWaiting = tracker.onPosted("trip", update("trip", 13, presentation = riding(2))) as CitymapperNavigationDecision.Show
         assertEquals(CitymapperTransitMode.UNKNOWN, afterUnknownWaiting.update.presentation.transitMode)
+    }
+
+    @Test
+    fun trackerCarriesObservedTrainWaitingModeToRiding() {
+        val tracker = CitymapperNavigationTracker()
+        val trainWaiting = presentation(
+            "1207 苗栗-Miaoli (北湖-Beihu | 嘉義-Chiayi | 苗栗-Miaoli)\n11, 25, 57分鐘",
+        )
+
+        tracker.onPosted("trip", update("trip", 1, presentation = trainWaiting))
+        val riding = tracker.onPosted(
+            "trip",
+            update("trip", 2, presentation = riding(5)),
+        ) as CitymapperNavigationDecision.Show
+
+        assertEquals(CitymapperTransitMode.TRAIN, riding.update.presentation.transitMode)
+        assertEquals(R.drawable.ic_train_notification, LiveStatusReminder.citymapperIcon(riding.update.presentation))
     }
 
     @Test
@@ -351,8 +452,10 @@ class CitymapperNavigationTest {
     private fun waiting(mode: CitymapperTransitMode) = CitymapperNavigationPresentation(
         CitymapperNavigationStage.WAITING, mode, transitTiming = countdown(3),
     )
-    private fun riding(stops: Int) = CitymapperNavigationPresentation(
-        CitymapperNavigationStage.RIDING, stops = stops,
+    private fun riding(totalStops: Int, remainingStops: Int? = 2) = CitymapperNavigationPresentation(
+        CitymapperNavigationStage.RIDING,
+        totalStops = totalStops,
+        remainingStops = remainingStops,
     )
     private fun trainDeparture() = CitymapperNavigationPresentation(
         CitymapperNavigationStage.TRAIN_DEPARTURE,

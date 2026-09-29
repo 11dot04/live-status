@@ -115,7 +115,7 @@ internal fun RequiredSettingsSection(
                 SettingCard(
                     number = "01",
                     title = "讀取狀態通知",
-                    description = "允許 App 辨識媒體播放、Clock、Google Recorder、YPT、Hevy、iPASS MONEY、台灣 Pay、YouBike、foodpanda、55688、Uber、Uber Eats、Citymapper 導航與 Pikmin Bloom 狀態。",
+                    description = "允許 App 辨識媒體播放、Clock、Google Recorder、YPT、Hevy、iPASS MONEY、台灣 Pay、YouBike、foodpanda、McDonald's、55688、Uber、Uber Eats、Citymapper 導航與 Pikmin Bloom 狀態。",
                     enabled = status.notificationAccess,
                     enabledText = "已開啟",
                     disabledText = "尚未開啟",
@@ -154,6 +154,8 @@ internal fun BrandWarningCard(
                             "⚠ Samsung Now Bar 可能限制第三方 Live Updates"
                         BrandWarning.XIAOMI_HYPER_ISLAND ->
                             stringResource(R.string.xiaomi_hyperos_warning_title)
+                        BrandWarning.ASUS_LIVE_UPDATES ->
+                            stringResource(R.string.asus_live_updates_warning_title)
                     },
                     18,
                     colors.warningText,
@@ -178,23 +180,32 @@ internal fun BrandWarningCard(
                 colors.warningText,
             )
             BrandWarning.XIAOMI_HYPER_ISLAND -> XiaomiWarningDescription()
+            BrandWarning.ASUS_LIVE_UPDATES -> AppText(
+                stringResource(R.string.asus_live_updates_warning_description),
+                15,
+                colors.warningText,
+            )
         }
-        if (brandWarning == BrandWarning.SAMSUNG_NOW_BAR) {
-            Spacer(Modifier.height(14.dp))
-            ActionButton(
-                "查看解決方法  →",
-                colors.warningText,
-                colors.warningContainer,
-                onClick = onOpenSamsungNowBarGuide,
-            )
-        } else {
-            Spacer(Modifier.height(14.dp))
-            ActionButton(
-                stringResource(R.string.xiaomi_open_app_settings),
-                colors.warningText,
-                colors.warningContainer,
-                onClick = onOpenAppSettings,
-            )
+        when (brandWarning) {
+            BrandWarning.SAMSUNG_NOW_BAR -> {
+                Spacer(Modifier.height(14.dp))
+                ActionButton(
+                    "查看解決方法 →",
+                    colors.warningText,
+                    colors.warningContainer,
+                    onClick = onOpenSamsungNowBarGuide,
+                )
+            }
+            BrandWarning.XIAOMI_HYPER_ISLAND -> {
+                Spacer(Modifier.height(14.dp))
+                ActionButton(
+                    stringResource(R.string.xiaomi_open_app_settings),
+                    colors.warningText,
+                    colors.warningContainer,
+                    onClick = onOpenAppSettings,
+                )
+            }
+            BrandWarning.ASUS_LIVE_UPDATES -> Unit
         }
     }
 }
