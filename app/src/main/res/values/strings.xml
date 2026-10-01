@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="MissingTranslation">
-    <string name="app_name">即時狀態提醒</string>
+    <string name="app_name">Live Status</string>
     <string name="notification_app_name">LiveStatus</string>
     <string name="notification_channel_name">即時狀態提醒</string>
     <string name="notification_channel_description">持續顯示 Discord 與 Teams 通話、倒數計時、讀書與健身時長、乘車、YouBike 騎乘費用、外送訂單與種花狀態</string>
