@@ -402,12 +402,14 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             REALME_MESSAGES_PACKAGE,
             REALME_HEYTAP_PACKAGE,
             WHATSAPP_PACKAGE -> {
-                val notificationTitle = readNotificationTitle(notification)
-                val notificationContentText = readNotificationContentText(notification)
-                val otp = LiveStatusNotificationParser.parseOtp(
-                    notificationTitle,
-                    notificationContentText ?: notificationText,
-                )
+                val title = readNotificationTitle(notification)
+                val contentText = readNotificationContentText(notification)
+                val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+
+// Combine all possible body extras so bank/carrier texts don't get truncated
+                val combinedBody = listOfNotNull(contentText, bigText, notificationText).distinct().joinToString(" ")
+
+                val otp = LiveStatusNotificationParser.parseOtp(title, combinedBody)
                 if (otp?.code != null) {
                     LiveStatusReminder.showOtp(this, otp.code, otp.sender)
                 }
