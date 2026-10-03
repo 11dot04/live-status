@@ -876,24 +876,32 @@ object LiveStatusReminder {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val builder = Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Verification Code: $code")
-            .setContentText(sender?.let { "From $it · Tap to share/copy" } ?: "Tap to share/copy")
-            .setContentIntent(clipboardIntent)
-            .setCategory(Notification.CATEGORY_STATUS)
-            .setOngoing(false)
-            .setOnlyAlertOnce(false)
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .setShortCriticalText("🔑 $code")
-            .addAction(
-                Notification.Action.Builder(
-                    Icon.createWithResource(context, R.drawable.ic_notification),
-                    "Copy $code",
-                    clipboardIntent,
-                ).build(),
-            )
-            .also(::requestPromotedOngoing)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+    .setSmallIcon(R.drawable.ic_notification)
+    .setContentTitle("Verification Code: $code")
+    .setContentText("From $sender · Tap to copy")
+    .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+    .setOngoing(true)
+    .setOnlyAlertOnce(true)
+    .setAutoCancel(false)
+    .addAction(
+        0,
+        "Copy $code",
+        PendingIntent.getBroadcast(
+            context,
+            code.hashCode(),
+            Intent(context, OtpCopyReceiver::class.java).apply {
+                putExtra("otp_code", code)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    )
+
+// Inject Android 16 / ColorOS Status Bar Live Update attributes
+builder.setShortCriticalText("🔑 $code")
+builder.extras.putBoolean("android.ongoingActivity", true)
+builder.extras.putString("oplus.liveNotificationType", "capsule")
+requestPromotedOngoing(builder)
 
         notificationManager(context).notify(OTP_NOTIFICATION_ID, builder.build())
 
