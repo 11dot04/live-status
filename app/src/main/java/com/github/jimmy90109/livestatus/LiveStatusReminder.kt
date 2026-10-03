@@ -862,7 +862,7 @@ object LiveStatusReminder {
         notificationManager(context).cancel(STRAVA_RECORDING_NOTIFICATION_ID)
     }
 
-    @JvmStatic
+    @    @JvmStatic
     fun showOtp(context: Context, code: String, sender: String? = null) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return
@@ -878,22 +878,28 @@ object LiveStatusReminder {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        val copyAction = Notification.Action.Builder(
+            Icon.createWithResource(context, R.drawable.ic_notification),
+            "Copy $code",
+            pendingIntent
+        ).build()
+
+        val builder = Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Verification Code: $code")
-            .setContentText("From ${sender ?: "SMS"} · Tap to copy/share")
-            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setContentText("From ${sender ?: "SMS"} · Tap to share/copy")
+            .setCategory(Notification.CATEGORY_PROGRESS)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setAutoCancel(false)
-            .addAction(0, "Copy $code", pendingIntent)
+            .addAction(copyAction)
 
         builder.setShortCriticalText("🔑 $code")
         builder.extras.putBoolean("android.ongoingActivity", true)
         builder.extras.putString("oplus.liveNotificationType", "capsule")
         requestPromotedOngoing(builder)
 
-        notificationManager.notify(NOTIFICATION_ID_OFFSET + 999, builder.build())
+        notificationManager.notify(9001, builder.build())
     }
 
     @JvmStatic
