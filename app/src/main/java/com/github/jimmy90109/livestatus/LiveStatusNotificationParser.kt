@@ -390,35 +390,49 @@ object LiveStatusNotificationParser {
         )
     }
 
-        data class OtpUpdate(
-        val code: String,
-        val sender: String? = null,
-    )
+    data class OtpUpdate(
+    val code: String,
+    val sender: String? = null,
+)
 
-    // Requires an explicit OTP keyword near the digits
-    private val strictOtpRegex = Regex(
-        """(?i)(?:otp|code|verification|passcode|one[- ]?time[\s\w]*code|pin)[\s\S]{0,25}?\b(\d{4,8})\b"""
-    )
-    private val reversedOtpRegex = Regex(
-        """\b(\d{4,8})\b[\s\S]{0,25}?(?:is your|valid for|expires in)"""
-    )
+// Matches keywords preceding or following digits across a broader text window
+private val otpKeywordNearDigits = Regex(
+    """(?i)(?:otp|code|verification|passcode|one[- ]?time[\s\w]*code|secret|pin)[\s\S]{0,60}?\b([0-9]{3,4}[-\s]?[0-9]{3,4}|[0-9]{4,8})\b"""
+)
+private val digitsNearOtpKeyword = Regex(
+    """\b([0-9]{3,4}[-\s]?[0-9]{3,4}|[0-9]{4,8})\b[\s\S]{0,40}?(?i:(?:is your|valid for|expires in|auth|secret))"""
+)
 
-    @JvmStatic
-    fun parseOtp(title: String?, text: String?): OtpUpdate? {
-        val fullContent = "${title.orEmpty()} ${text.orEmpty()}".replace("\n", " ").trim()
-        if (fullContent.isBlank()) return null
+@JvmStatic
+fun parseOtp(title: String?, text: String?): OtpUpdate? {
+    val fullContent = "${title.orEmpty()} ${text.orEmpty()}".replace("\n", " ").trim()
+    if (fullContent.isBlank()) return null
 
-        val match = strictOtpRegex.find(fullContent)?.groupValues?.getOrNull(1)
-            ?: reversedOtpRegex.find(fullContent)?.groupValues?.getOrNull(1)
-            ?: return null
+    // 1. Extract candidate match
+    val rawCandidate = otpKeywordNearDigits.find(fullContent)?.groupValues?.getOrNull(1)
+        ?: digitsNearOtpKeyword.find(fullContent)?.groupValues?.getOrNull(1)
+        ?: return null
 
-        // Ignore common years (2020-2035) to prevent timestamp false positives
-        if (match.length == 4 && match.toIntOrNull() in 2020..2035) {
-            return null
-        }
+    // 2. Normalize hyphens and spaces (e.g., "123-456" -> "123456")
+    val cleanCode = rawCandidate.replace("-", "").replace(" ", "").trim()
 
-        return OtpUpdate(code = match, sender = title)
+    // 3. Filter false positives: ignore years and date-like sequences
+    if (cleanCode.length == 4 && cleanCode.toIntOrNull() in 2020..2035) {
+        return null
     }
+    
+    // Ignore typical times formatted as 4 digits (e.g. 1030, 2359) when near time markers
+    if (fullContent.contains(Regex("""(?i)\b(?:at|on|hours|hrs)\s+$cleanCode\b"""))) {
+        return null
+    }
+
+    return if (cleanCode.length in 4..8) {
+        OtpUpdate(code = cleanCode, sender = title)
+    } else {
+        null
+    }
+}
+
 
     @JvmStatic
     fun parsePikminBloom(notificationText: String?): PikminUpdate {
