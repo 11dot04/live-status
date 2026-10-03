@@ -391,28 +391,33 @@ object LiveStatusNotificationParser {
     }
 
         data class OtpUpdate(
-        val code: String?,
-        val sender: String? = null
+        val code: String,
+        val sender: String? = null,
+    )
+
+    // Requires an explicit OTP keyword near the digits
+    private val strictOtpRegex = Regex(
+        """(?i)(?:otp|code|verification|passcode|one[- ]?time[\s\w]*code|pin)[\s\S]{0,25}?\b(\d{4,8})\b"""
+    )
+    private val reversedOtpRegex = Regex(
+        """\b(\d{4,8})\b[\s\S]{0,25}?(?:is your|valid for|expires in)"""
     )
 
     @JvmStatic
     fun parseOtp(title: String?, text: String?): OtpUpdate? {
-        val fullContent = "${title.orEmpty()} ${text.orEmpty()}"
+        val fullContent = "${title.orEmpty()} ${text.orEmpty()}".replace("\n", " ").trim()
         if (fullContent.isBlank()) return null
 
-        // 1. Try finding a code paired with a security keyword
-        val matchedCode = otpRegex.find(fullContent)?.groupValues?.getOrNull(1)
-            ?: run {
-                // 2. Fallback: if message is short or contains "is your", check for standalone digits
-                if (fullContent.contains(Regex("""(?i)\b(is your|valid for|expires in)\b"""))) {
-                    standaloneCodeRegex.find(fullContent)?.value
-                } else null
-            }
+        val match = strictOtpRegex.find(fullContent)?.groupValues?.getOrNull(1)
+            ?: reversedOtpRegex.find(fullContent)?.groupValues?.getOrNull(1)
+            ?: return null
 
-        return if (matchedCode != null) {
-            OtpUpdate(code = matchedCode, sender = title)
-        } else null
-  
+        // Ignore common years (2020-2035) to prevent timestamp false positives
+        if (match.length == 4 && match.toIntOrNull() in 2020..2035) {
+            return null
+        }
+
+        return OtpUpdate(code = match, sender = title)
     }
 
     @JvmStatic
