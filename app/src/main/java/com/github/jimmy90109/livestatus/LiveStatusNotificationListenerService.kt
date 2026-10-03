@@ -406,6 +406,14 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 val contentText = readNotificationContentText(notification)
                 val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
 
+                // Extract messages specifically for WhatsApp / MessagingStyle apps
+                val messagingStyleText = if (statusBarNotification.packageName == "com.whatsapp") {
+                    val messages = notification.extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+                    messages?.mapNotNull { msg ->
+                        if (msg is android.os.Bundle) msg.getCharSequence("text")?.toString() else null
+                    }?.joinToString(" ")
+                } else null
+
 // Combine all possible body extras so bank/carrier texts don't get truncated
                 val combinedBody = listOfNotNull(contentText, bigText, notificationText).distinct().joinToString(" ")
 
