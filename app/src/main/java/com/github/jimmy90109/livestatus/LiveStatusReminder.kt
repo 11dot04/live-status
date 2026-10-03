@@ -862,55 +862,38 @@ object LiveStatusReminder {
         notificationManager(context).cancel(STRAVA_RECORDING_NOTIFICATION_ID)
     }
 
-        @JvmStatic
+    @JvmStatic
     fun showOtp(context: Context, code: String, sender: String? = null) {
-        createChannel(context)
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            ?: return
 
-        otpDismissHandler.removeCallbacksAndMessages(null)
-
-        val clipIntent = Intent("com.github.jimmy90109.livestatus.ACTION_COPY_OTP").apply {
-            setPackage(context.packageName)
-            putExtra("otp_code", code)
+        val clipIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, code)
         }
-        val pendingIntent = PendingIntent.getBroadcast(
+        val pendingIntent = PendingIntent.getActivity(
             context,
             code.hashCode(),
-            clipIntent,
+            Intent.createChooser(clipIntent, "Share code"),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-    .setSmallIcon(R.drawable.ic_notification)
-    .setContentTitle("Verification Code: $code")
-    .setContentText("From $sender · Tap to copy")
-    .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-    .setOngoing(true)
-    .setOnlyAlertOnce(true)
-    .setAutoCancel(false)
-    .addAction(
-        0,
-        "Copy $code",
-        PendingIntent.getBroadcast(
-            context,
-            code.hashCode(),
-            Intent(context, OtpCopyReceiver::class.java).apply {
-                putExtra("otp_code", code)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-    )
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Verification Code: $code")
+            .setContentText("From ${sender ?: "SMS"} · Tap to copy/share")
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setAutoCancel(false)
+            .addAction(0, "Copy $code", pendingIntent)
 
-// Inject Android 16 / ColorOS Status Bar Live Update attributes
-builder.setShortCriticalText("🔑 $code")
-builder.extras.putBoolean("android.ongoingActivity", true)
-builder.extras.putString("oplus.liveNotificationType", "capsule")
-requestPromotedOngoing(builder)
+        builder.setShortCriticalText("🔑 $code")
+        builder.extras.putBoolean("android.ongoingActivity", true)
+        builder.extras.putString("oplus.liveNotificationType", "capsule")
+        requestPromotedOngoing(builder)
 
-        notificationManager(context).notify(OTP_NOTIFICATION_ID, builder.build())
-
-        otpDismissHandler.postDelayed({
-            notificationManager(context).cancel(OTP_NOTIFICATION_ID)
-        }, 45_000L)
+        notificationManager.notify(NOTIFICATION_ID_OFFSET + 999, builder.build())
     }
 
     @JvmStatic
