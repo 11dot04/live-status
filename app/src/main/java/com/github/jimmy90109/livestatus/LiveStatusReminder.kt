@@ -862,7 +862,7 @@ object LiveStatusReminder {
         notificationManager(context).cancel(STRAVA_RECORDING_NOTIFICATION_ID)
     }
 
-    @    @JvmStatic
+    @JvmStatic
     fun showOtp(context: Context, code: String, sender: String? = null) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return
