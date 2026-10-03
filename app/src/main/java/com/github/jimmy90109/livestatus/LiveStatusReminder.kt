@@ -867,45 +867,43 @@ object LiveStatusReminder {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return
 
-        val clipIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, code)
+        val notificationId = 9001
+
+        val copyIntent = Intent(context, OtpCopyReceiver::class.java).apply {
+            putExtra("otp_code", code)
+            putExtra("notification_id", notificationId)
         }
-        val pendingIntent = PendingIntent.getActivity(
+        val pendingIntent = PendingIntent.getReceiver(
             context,
             code.hashCode(),
-            Intent.createChooser(clipIntent, "Share code"),
+            copyIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val copyAction = Notification.Action.Builder(
-            Icon.createWithResource(context, R.drawable.ic_notification),
+            Icon.createWithResource(context, R.drawable.ic_key),
             "Copy $code",
             pendingIntent
         ).build()
 
         val builder = Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_key)
             .setContentTitle("Verification Code: $code")
-            .setContentText("From ${sender ?: "SMS"} · Tap to share/copy")
+            .setContentText("From ${sender ?: "SMS"} · Tap to copy")
             .setCategory(Notification.CATEGORY_PROGRESS)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setAutoCancel(false)
+            .setAutoCancel(true)
+            .setTimeoutAfter(3 * 60 * 1000L) // Auto-clears pill after 3 minutes
             .addAction(copyAction)
 
-        builder.setShortCriticalText("🔑 $code")
+        // Native pill text (clean, no emoji)
+        builder.setShortCriticalText(code)
         builder.extras.putBoolean("android.ongoingActivity", true)
         builder.extras.putString("oplus.liveNotificationType", "capsule")
         requestPromotedOngoing(builder)
 
-        notificationManager.notify(9001, builder.build())
-    }
-
-    @JvmStatic
-    fun clearOtp(context: Context) {
-        otpDismissHandler.removeCallbacksAndMessages(null)
-        notificationManager(context).cancel(OTP_NOTIFICATION_ID)
+        notificationManager.notify(notificationId, builder.build())
     }
 
     internal fun showDiscordVoice(context: Context, update: DiscordVoiceUpdate) {
