@@ -873,12 +873,12 @@ object LiveStatusReminder {
             putExtra("otp_code", code)
             putExtra("notification_id", notificationId)
         }
-        val pendingIntent = PendingIntent.getReceiver(
-            context,
-            code.hashCode(),
-            copyIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+       val pendingIntent = PendingIntent.getBroadcast(
+           context,
+           code.hashCode(),
+           copyIntent,
+           PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+       )
 
         val copyAction = Notification.Action.Builder(
             Icon.createWithResource(context, R.drawable.ic_key),
