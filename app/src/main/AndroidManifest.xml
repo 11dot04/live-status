@@ -66,6 +66,10 @@
             android:name=".YouBikeTrackingActionReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".OtpCopyReceiver"
+            android:exported="false" />
+        
         <service
             android:name=".LiveStatusNotificationListenerService"
             android:exported="true"
