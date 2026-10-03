@@ -4,6 +4,8 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Intent
+import androidx.core.app.NotificationCompat
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.Icon
@@ -866,14 +868,15 @@ object LiveStatusReminder {
 
         otpDismissHandler.removeCallbacksAndMessages(null)
 
-        val clipboardIntent = PendingIntent.getActivity(
+        val clipIntent = Intent("com.github.jimmy90109.livestatus.ACTION_COPY_OTP").apply {
+            setPackage(context.packageName)
+            putExtra("otp_code", code)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
             context,
-            18,
-            android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(android.content.Intent.EXTRA_TEXT, code)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            code.hashCode(),
+            clipIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
