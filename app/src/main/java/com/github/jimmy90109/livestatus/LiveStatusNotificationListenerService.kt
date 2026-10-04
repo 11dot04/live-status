@@ -74,6 +74,24 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             statusBarNotification.packageName,
             notification,
         )
+        val title = readNotificationTitle(notification)
+        val contentText = readNotificationContentText(notification)
+        val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+        val fullText = listOfNotNull(title, contentText, bigText, notificationText).distinct().joinToString(" ")
+
+        val customMatch = CustomRuleEngine.evaluate(statusBarNotification.packageName, fullText)
+        if (customMatch != null) {
+            LiveStatusReminder.showCustomCapsule(
+                context = this,
+                pillText = customMatch.pillText,
+                iconName = customMatch.iconName,
+                title = title ?: "Live Update",
+                content = fullText,
+                timeoutSeconds = customMatch.timeoutSeconds
+            )
+            return
+        
+        }
         when (statusBarNotification.packageName) {
             CITYMAPPER_PACKAGE -> {
                 if (BuildConfig.DEBUG) {
