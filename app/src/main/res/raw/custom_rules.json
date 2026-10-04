@@ -21,10 +21,31 @@
     "timeoutSeconds": 15
   }
   {
-  "package": "com.android.printspooler",
-  "regex": "(?i)printing page (\\d+) of (\\d+)|printing",
-  "template": "{1}/{2}",
-  "icon": "ic_capsule_print",
-  "timeoutSeconds": 30
+    "package": "org.brilliant.android",
+    "regex": "(?i)(\\d+)\\s*(?:day streak|days streak)",
+    "template": "{1}d",
+    "icon": "ic_capsule_fire",
+    "timeoutSeconds": 180
+  },
+  {
+    "package": "com.chess",
+    "regex": "(?i)(\\d+)\\s*(?:day streak|puzzle streak|streak)",
+    "template": "{1}d",
+    "icon": "ic_capsule_fire",
+    "timeoutSeconds": 180
+  },
+  {
+    "package": "com.matiks",
+    "regex": "(?i)(\\d+)\\s*(?:day streak|days streak|streak)",
+    "template": "{1}d",
+    "icon": "ic_capsule_fire",
+    "timeoutSeconds": 180
+  },
+  {
+    "package": "com.android.printspooler",
+    "regex": "(?i)printing page (\\d+) of (\\d+)|printing",
+    "template": "Page {1}/{2}",
+    "icon": "ic_capsule_print",
+    "timeoutSeconds": 30
   }
 ]
