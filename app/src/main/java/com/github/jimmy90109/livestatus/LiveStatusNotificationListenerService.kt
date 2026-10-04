@@ -56,6 +56,11 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
+        runCatching {
+            resources.openRawResource(R.raw.custom_rules).use {
+                LiveStatusNotificationParser.CustomRuleEngine.loadRules(it)
+            }
+        }
         AppReminderPreferences.registerListener(this, citymapperPreferenceListener)
     }
 
@@ -398,6 +403,25 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                     LiveStatusReminder.clearHevyWorkout(this)
                 }
             }
+                val title = readNotificationTitle(notification)
+                val contentText = readNotificationContentText(notification)
+                val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+                val fullText = listOfNotNull(title, contentText, bigText, notificationText).distinct().joinToString(" ")
+
+        // Evaluate user-defined custom rules (Duolingo, GPay, PhonePe, etc.)
+        val customMatch = LiveStatusNotificationParser.CustomRuleEngine.evaluate(statusBarNotification.packageName, fullText)
+        if (customMatch != null) {
+            LiveStatusReminder.showCustomCapsule(
+                context = this,
+                pillText = customMatch.pillText,
+                iconName = customMatch.iconName,
+                title = title ?: "Live Update",
+                content = fullText,
+                timeoutSeconds = customMatch.timeoutSeconds
+            )
+            return // Capsule posted, skip standard handlers
+        }
+
             GOOGLE_MESSAGES_PACKAGE,
             REALME_MESSAGES_PACKAGE,
             REALME_HEYTAP_PACKAGE,
