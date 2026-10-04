@@ -1,0 +1,30 @@
+[
+  {
+    "package": "com.duolingo",
+    "regex": "(?i)(\\d+)\\s*(?:day streak|days streak)",
+    "template": "{1}d",
+    "icon": "ic_capsule_fire",
+    "timeoutSeconds": 180
+  },
+  {
+    "package": "com.google.android.apps.nbu.paisa.user",
+    "regex": "(?i)(?:received|credited with|sent you)\\D*₹?\\s*([\\d,]+(?:\\.\\d{2})?)",
+    "template": "₹{1}",
+    "icon": "ic_capsule_upi",
+    "timeoutSeconds": 15
+  },
+  {
+    "package": "com.phonepe.app",
+    "regex": "(?i)(?:credited by|received)\\D*₹?\\s*([\\d,]+(?:\\.\\d{2})?)",
+    "template": "₹{1}",
+    "icon": "ic_capsule_upi",
+    "timeoutSeconds": 15
+  }
+  {
+  "package": "com.android.printspooler",
+  "regex": "(?i)printing page (\\d+) of (\\d+)|printing",
+  "template": "{1}/{2}",
+  "icon": "ic_capsule_print",
+  "timeoutSeconds": 30
+  }
+]
