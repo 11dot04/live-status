@@ -56,11 +56,12 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
-        runCatching {
+        runCatching<Unit> {
             resources.openRawResource(R.raw.custom_rules).use {
-                LiveStatusNotificationParser.CustomRuleEngine.loadRules(it)
+                CustomRuleEngine.loadRules(it)
             }
         }
+
         AppReminderPreferences.registerListener(this, citymapperPreferenceListener)
     }
 
