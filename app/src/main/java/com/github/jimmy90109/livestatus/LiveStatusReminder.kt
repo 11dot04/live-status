@@ -906,6 +906,46 @@ object LiveStatusReminder {
         notificationManager.notify(notificationId, builder.build())
     }
 
+    @JvmStatic
+    fun showCustomCapsule(
+        context: Context,
+        pillText: String,
+        iconName: String?,
+        title: String,
+        content: String,
+        timeoutSeconds: Int
+    ) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            ?: return
+
+        val iconResId = if (!iconName.isNullOrBlank()) {
+            val resolvedId = context.resources.getIdentifier(iconName, "drawable", context.packageName)
+            if (resolvedId != 0) resolvedId else R.drawable.ic_notification
+        } else {
+            R.drawable.ic_notification
+        }
+
+        val notificationId = 9002
+
+        val builder = Notification.Builder(context, CHANNEL_ID)
+            .setSmallIcon(iconResId)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setCategory(Notification.CATEGORY_STATUS)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setAutoCancel(true)
+            .setTimeoutAfter(timeoutSeconds * 1000L)
+
+        builder.setShortCriticalText(pillText)
+        builder.extras.putBoolean("android.ongoingActivity", true)
+        builder.extras.putString("oplus.liveNotificationType", "capsule")
+        requestPromotedOngoing(builder)
+
+        notificationManager.notify(notificationId, builder.build())
+
+    }
+
     internal fun showDiscordVoice(context: Context, update: DiscordVoiceUpdate) {
         
         createDiscordVoiceChannel(context)
