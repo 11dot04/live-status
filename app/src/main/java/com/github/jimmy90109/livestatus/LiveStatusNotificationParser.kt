@@ -605,6 +605,5 @@ object CustomRuleEngine {
             }
         }
         return null
-  
     }
 }
