@@ -44,8 +44,7 @@
 
         <activity
             android:name=".ProcessTextActivity"
-            android:label="Define"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:label="Inspect"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
@@ -63,6 +62,10 @@
             android:taskAffinity=""
             android:theme="@style/Theme.LiveStatusReminder.Dialog" />
 
+        <receiver
+            android:name=".CapsuleDismissReceiver"
+            android:exported="false" />
+        
         <receiver
             android:name=".YouBikeFareAlarmReceiver"
             android:exported="false">
