@@ -79,6 +79,25 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
         val fullText = listOfNotNull(title, contentText, bigText, notificationText).distinct().joinToString(" ")
 
+                // Catch-all: Download / Upload progress bars
+        val maxProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
+        val currentProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS, 0)
+        val isIndeterminate = notification.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
+
+        if (maxProgress > 0 && !isIndeterminate) {
+            val percent = ((currentProgress.toDouble() / maxProgress) * 100).toInt()
+            LiveStatusReminder.showCustomCapsule(
+                context = this,
+                pillText = "$percent%",
+                iconName = "ic_capsule_download",
+                title = title ?: "Progress",
+                content = "$currentProgress / $maxProgress",
+                timeoutSeconds = 5
+            )
+            return
+        
+        }
+        
         val customMatch = CustomRuleEngine.evaluate(statusBarNotification.packageName, fullText)
         if (customMatch != null) {
             LiveStatusReminder.showCustomCapsule(
