@@ -5,8 +5,22 @@ import kotlinx.coroutines.*
 import java.util.Calendar
 
 object CalendarCountdownManager {
+package com.github.jimmy90109.livestatus
 
+import android.app.NotificationManager
+import android.content.Context
+import kotlinx.coroutines.*
+import java.util.Calendar
+
+object CalendarCountdownManager {
+
+    private const val CAPSULE_NOTIFICATION_ID = 9002
     private var countdownJob: Job? = null
+
+    private fun cancelCapsuleNotification(context: Context) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        notificationManager?.cancel(CAPSULE_NOTIFICATION_ID)
+    }
 
     fun startCountdown(
         context: Context,
@@ -35,7 +49,7 @@ object CalendarCountdownManager {
                 val remainingMillis = target.timeInMillis - System.currentTimeMillis()
 
                 if (remainingMillis <= 0) {
-                    LiveStatusReminder.dismiss(appContext)
+                    cancelCapsuleNotification(appContext)
                     break
                 }
 
@@ -48,7 +62,7 @@ object CalendarCountdownManager {
                     iconName = "ic_capsule_calendar",
                     title = eventTitle,
                     content = "Starts in $minutesLeft min",
-                    timeoutSeconds = 0
+                    timeoutSeconds = 60
                 )
 
                 delay(30_000L)
@@ -59,6 +73,6 @@ object CalendarCountdownManager {
     fun stop(context: Context) {
         countdownJob?.cancel()
         countdownJob = null
-        LiveStatusReminder.dismiss(context.applicationContext)
+        cancelCapsuleNotification(context.applicationContext)
     }
 }
