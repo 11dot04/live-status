@@ -35,7 +35,7 @@ object CalendarCountdownManager {
                 val remainingMillis = target.timeInMillis - System.currentTimeMillis()
 
                 if (remainingMillis <= 0) {
-                    LiveStatusReminder.dismissCapsule(appContext)
+                    LiveStatusReminder.dismiss(appContext)
                     break
                 }
 
@@ -59,6 +59,6 @@ object CalendarCountdownManager {
     fun stop(context: Context) {
         countdownJob?.cancel()
         countdownJob = null
-        LiveStatusReminder.dismissCapsule(context.applicationContext)
+        LiveStatusReminder.dismiss(context.applicationContext)
     }
 }
