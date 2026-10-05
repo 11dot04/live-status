@@ -50,32 +50,151 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             },
         )
     }
+    private var lastMediaTrack: String? = null
+    private var wasVpnConnected = false
+
+    private val ringerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == AudioManager.RINGER_MODE_CHANGED_ACTION) {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val (modeName, iconName) = when (audioManager.ringerMode) {
+                    AudioManager.RINGER_MODE_SILENT -> "Silent" to "ic_volume_off"
+                    AudioManager.RINGER_MODE_VIBRATE -> "Vibrate" to "ic_vibration"
+                    AudioManager.RINGER_MODE_NORMAL -> "Ring" to "ic_volume_up"
+                    else -> return
+                }
+
+                LiveStatusReminder.showCustomCapsule(
+                    context = context,
+                    pillText = modeName,
+                    iconName = iconName,
+                    title = "sound mode",
+                    content = "switched to $modeName",
+                    timeoutSeconds = 3,
+                    notificationId = 9007
+                )
+            }
+        }
+    }
+
+    private val bluetoothReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+            } ?: return
+
+            val deviceName = try { device.name ?: "Device" } catch (_: SecurityException) { "Device" }
+
+            when (intent.action) {
+                BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                    LiveStatusReminder.showCustomCapsule(
+                        context = context,
+                        pillText = deviceName.take(10),
+                        iconName = "ic_bluetooth",
+                        title = "connected",
+                        content = deviceName,
+                        timeoutSeconds = 4,
+                        notificationId = 9008
+                    )
+                }
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                    LiveStatusReminder.showCustomCapsule(
+                        context = context,
+                        pillText = "offline",
+                        iconName = "ic_bluetooth",
+                        title = "disconnected",
+                        content = deviceName,
+                        timeoutSeconds = 3,
+                        notificationId = 9008
+                    )
+                }
+            }
+        }
+    }
+
+    private val vpnReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val activeNetwork = cm.activeNetwork
+            val caps = cm.getNetworkCapabilities(activeNetwork)
+            val isVpn = caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+
+            if (isVpn && !wasVpnConnected) {
+                wasVpnConnected = true
+                LiveStatusReminder.showCustomCapsule(
+                    context = context,
+                    pillText = "vpn on",
+                    iconName = "ic_vpn_key",
+                    title = "vpn connected",
+                    content = "secure network tunnel active",
+                    timeoutSeconds = 4,
+                    notificationId = 9009
+                )
+            } else if (!isVpn && wasVpnConnected) {
+                wasVpnConnected = false
+                LiveStatusReminder.showCustomCapsule(
+                    context = context,
+                    pillText = "vpn off",
+                    iconName = "ic_vpn_key",
+                    title = "vpn disconnected",
+                    content = "network tunnel closed",
+                    timeoutSeconds = 3,
+                    notificationId = 9009
+                )
+            }
+        }
+    }
     private var lastUberRideUpdate =
         LiveStatusNotificationParser.UberRideUpdate(LiveStatusNotificationParser.UberRideEvent.NONE)
     private val uberEatsTracker = UberEatsTracker()
-
+    
     override fun onCreate() {
         super.onCreate()
-        runCatching<Unit> {
-            resources.openRawResource(R.raw.custom_rules).use {
-                CustomRuleEngine.loadRules(it)
+        registerReceiver(ringerReceiver, IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION))
+        val btFilter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        }
+        registerReceiver(bluetoothReceiver, btFilter)
+        registerReceiver(vpnReceiver, IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION))
+
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.addPrimaryClipChangedListener {
+            val clip = clipboard.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                val text = clip.getItemAt(0).coerceToText(this).toString().trim()
+                if (text.isNotBlank()) {
+                    LiveStatusReminder.showCustomCapsule(
+                        context = this,
+                        pillText = "copied",
+                        iconName = "ic_capsule_search",
+                        title = "clipboard",
+                        content = text.take(120),
+                        timeoutSeconds = 3,
+                        notificationId = 9010
+                    )
+                }
             }
         }
+
 
         AppReminderPreferences.registerListener(this, citymapperPreferenceListener)
     }
 
-    override fun onNotificationPosted(statusBarNotification: StatusBarNotification) {
-        if (statusBarNotification.packageName == packageName) return
+    override fun onNotificationPosted(statusBarNotification: StatusBarNotification?) {
+        super.onNotificationPosted(statusBarNotification)
+        if (statusBarNotification == null) return
+
         mediaPlaybackMonitor.onNotificationPosted(statusBarNotification)
-        val notification = statusBarNotification.notification
-        val notificationText = readNotificationText(
-            this,
-            statusBarNotification.packageName,
-            notification,
-        )
-        val title = readNotificationTitle(notification) ?: ""
-        val contentText = readNotificationContentText(notification) ?: ""
+
+        val notification = statusBarNotification.notification ?: return
+        val notificationText = readNotificationText(this, statusBarNotification.packageName, notification)
+
+        val title = readNotificationTitle(notification)
+        val contentText = readNotificationContentText(notification)
         val subText = notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
         val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
         val lines = notification.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
@@ -85,26 +204,60 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             .distinct()
             .joinToString(" ")
 
-
-        // 1. Direct Catch-all for System & App Progress
+        // 1. Progress Hook
         val maxProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
         val currentProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS, 0)
         val isIndeterminate = notification.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
 
         if (maxProgress > 0 && !isIndeterminate) {
-            val percent = ((currentProgress.toDouble() / maxProgress) * 100).toInt()
+            val percent = ((currentProgress.toDouble() / maxProgress) * 100).toInt().coerceIn(0, 100)
+            val appLabel = try {
+                packageManager.getApplicationLabel(
+                    packageManager.getApplicationInfo(statusBarNotification.packageName, 0)
+                ).toString()
+            } catch (_: Exception) {
+                statusBarNotification.packageName
+            }
+
+            val fileDetail = when {
+                contentText.isNotBlank() && !contentText.matches(Regex("""^\d+[\s/]+\d+$""")) -> contentText
+                bigText.isNotBlank() -> bigText
+                title.isNotBlank() && title != appLabel -> title
+                else -> "$currentProgress / $maxProgress"
+            }
+
             LiveStatusReminder.showCustomCapsule(
                 context = this,
                 pillText = "$percent%",
                 iconName = "ic_capsule_download",
-                title = if (title.isNotBlank()) title else "Progress",
-                content = "$currentProgress / $maxProgress",
-                timeoutSeconds = 5
+                title = "$appLabel ($percent%)",
+                content = fileDetail,
+                timeoutSeconds = 0,
+                notificationId = 9005
             )
             return
         }
 
-        // 2. Direct Calendar Interceptor
+        // 2. Track Change Hook
+        val isMedia = notification.category == Notification.CATEGORY_TRANSPORT ||
+                      notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
+        if (isMedia && title.isNotBlank()) {
+            val trackIdentifier = "$title - $contentText"
+            if (trackIdentifier != lastMediaTrack) {
+                lastMediaTrack = trackIdentifier
+                LiveStatusReminder.showCustomCapsule(
+                    context = this,
+                    pillText = title.take(12).lowercase(Locale.ROOT),
+                    iconName = "ic_music_notification",
+                    title = title.lowercase(Locale.ROOT),
+                    content = if (contentText.isNotBlank()) contentText else "now playing",
+                    timeoutSeconds = 5,
+                    notificationId = 9006
+                )
+            }
+        }
+
+        // 3. Calendar Interceptor
         if (statusBarNotification.packageName == "com.google.android.calendar" ||
             statusBarNotification.packageName == "com.oplus.calendar") {
 
@@ -117,7 +270,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
                 CalendarCountdownManager.startCountdown(
                     context = this,
-                    eventTitle = if (title.isNotBlank()) title else "Calendar Event",
+                    eventTitle = if (title.isNotBlank()) title else "calendar event",
                     targetHour = hour,
                     targetMinute = minute
                 )
@@ -125,7 +278,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        // 3. Fallback to custom_rules.json engine (evaluate title first, then fullText)
+        // 4. Custom Rules Engine (Evaluate Title First, then Full Text)
         val titleMatch = if (title.isNotBlank()) {
             CustomRuleEngine.evaluate(statusBarNotification.packageName, title)
         } else null
@@ -137,12 +290,14 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 context = this,
                 pillText = customMatch.pillText,
                 iconName = customMatch.iconName,
-                title = if (title.isNotBlank()) title else "Live Update",
+                title = if (title.isNotBlank()) title else "live update",
                 content = if (contentText.isNotBlank()) contentText else fullText,
-                timeoutSeconds = customMatch.timeoutSeconds
+                timeoutSeconds = customMatch.timeoutSeconds,
+                notificationId = 9004
             )
             return
         }
+
         
         when (statusBarNotification.packageName) {
             CITYMAPPER_PACKAGE -> {
@@ -731,8 +886,11 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         stopClockTimerRefresh()
         mediaPlaybackMonitor.stop()
         super.onDestroy()
+        unregisterReceiver(ringerReceiver)
+        unregisterReceiver(bluetoothReceiver)
+        unregisterReceiver(vpnReceiver)
     }
-
+    
     override fun onListenerConnected() {
         super.onListenerConnected()
         val activeNotifications = getActiveNotifications()
@@ -1284,3 +1442,4 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             toString().replace(Regex("""\s+"""), " ").trim().takeIf { it.isNotEmpty() }
     }
 }
+
