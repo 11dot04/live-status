@@ -74,12 +74,16 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             statusBarNotification.packageName,
             notification,
         )
-        val title = readNotificationTitle(notification)
-        val contentText = readNotificationContentText(notification)
-        val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
-        val fullText = listOfNotNull(title, contentText, bigText, notificationText).distinct().joinToString(" ")
+        val title = readNotificationTitle(notification) ?: ""
+        val contentText = readNotificationContentText(notification) ?: ""
+        val subText = notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
+        val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
+        val fullText = listOf(title, contentText, subText, bigText, notificationText)
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" ")
 
-                // Catch-all: Download / Upload progress bars
+        // 1. Direct Catch-all for System & App Progress
         val maxProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
         val currentProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS, 0)
         val isIndeterminate = notification.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
@@ -90,12 +94,45 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 context = this,
                 pillText = "$percent%",
                 iconName = "ic_capsule_download",
-                title = title ?: "Progress",
+                title = if (title.isNotBlank()) title else "Progress",
                 content = "$currentProgress / $maxProgress",
                 timeoutSeconds = 5
             )
             return
-        
+        }
+
+        // 2. Direct Calendar Interceptor (Google Calendar & OnePlus/OPPO Calendar)
+        if (statusBarNotification.packageName == "com.google.android.calendar" || 
+            statusBarNotification.packageName == "com.oplus.calendar") {
+            
+            // Matches: "15:15", "15:15–16:15", "in 10 min", "3:30 PM"
+            val timeRegex = Regex("(?i)(in\\s+\\d+\\s*(?:min|m|hr|h)|\\d{1,2}:\\d{2})")
+            val match = timeRegex.find(fullText)
+            val pillText = match?.value ?: "Event"
+
+            LiveStatusReminder.showCustomCapsule(
+                context = this,
+                pillText = pillText.take(10),
+                iconName = "ic_capsule_calendar",
+                title = if (title.isNotBlank()) title else "Calendar",
+                content = if (contentText.isNotBlank()) contentText else fullText,
+                timeoutSeconds = 30
+            )
+            return
+        }
+
+        // 3. Fallback to custom_rules.json engine
+        val customMatch = CustomRuleEngine.evaluate(statusBarNotification.packageName, fullText)
+        if (customMatch != null) {
+            LiveStatusReminder.showCustomCapsule(
+                context = this,
+                pillText = customMatch.pillText,
+                iconName = customMatch.iconName,
+                title = if (title.isNotBlank()) title else "Live Update",
+                content = fullText,
+                timeoutSeconds = customMatch.timeoutSeconds
+            )
+            return
         }
         
         val customMatch = CustomRuleEngine.evaluate(statusBarNotification.packageName, fullText)
