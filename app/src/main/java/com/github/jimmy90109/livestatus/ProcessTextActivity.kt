@@ -3,6 +3,8 @@ package com.github.jimmy90109.livestatus
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import org.json.JSONArray
@@ -14,18 +16,20 @@ import kotlin.concurrent.thread
 
 class ProcessTextActivity : Activity() {
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val selectedText = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.trim()
+        val rawText = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.trim()
 
-        if (selectedText.isNullOrBlank()) {
+        if (rawText.isNullOrBlank()) {
             finish()
             return
         }
 
-        // Clean out trailing punctuation and whitespace
-        val cleanWord = selectedText.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
+        // Strip punctuation like quotes, commas, periods
+        val cleanWord = rawText.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
         val appContext = applicationContext
 
         thread {
@@ -36,12 +40,12 @@ class ProcessTextActivity : Activity() {
                     connectTimeout = 5000
                     readTimeout = 5000
                     requestMethod = "GET"
-                    setRequestProperty("User-Agent", "LiveStatus-Android/1.0")
+                    setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Mobile)")
                     setRequestProperty("Accept", "application/json")
                 }
 
-                val responseCode = conn.responseCode
-                if (responseCode == 200) {
+                val code = conn.responseCode
+                if (code == 200) {
                     val stream = BufferedReader(InputStreamReader(conn.inputStream))
                     val response = stream.use { it.readText() }
                     val jsonArray = JSONArray(response)
@@ -59,21 +63,28 @@ class ProcessTextActivity : Activity() {
                         word
                     }
 
-                    LiveStatusReminder.showCustomCapsule(
-                        context = appContext,
-                        pillText = pillLabel.take(12),
-                        iconName = "ic_capsule_search",
-                        title = word.replaceFirstChar { it.uppercase() },
-                        content = definitionText,
-                        timeoutSeconds = 8
-                    )
+                    mainHandler.post {
+                        LiveStatusReminder.showCustomCapsule(
+                            context = appContext,
+                            pillText = pillLabel.take(12),
+                            iconName = "ic_capsule_search",
+                            title = word.replaceFirstChar { it.uppercase() },
+                            content = definitionText,
+                            timeoutSeconds = 8
+                        )
+                    }
                 } else {
-                    Log.w("ProcessText", "Dictionary API returned code: $responseCode")
+                    mainHandler.post {
+                        Toast.makeText(appContext, "Definition not found ($code)", Toast.LENGTH_SHORT).show()
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("ProcessText", "Failed to fetch definition", e)
+                Log.e("ProcessText", "Error fetching word", e)
+                mainHandler.post {
+                    Toast.makeText(appContext, "Network error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                }
             } finally {
-                runOnUiThread {
+                mainHandler.post {
                     finish()
                 }
             }
