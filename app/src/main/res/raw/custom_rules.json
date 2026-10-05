@@ -1,12 +1,5 @@
 [
   {
-    "package": "com.duolingo",
-    "regex": "(?i)(\\d+)\\s*(?:day streak|days streak)",
-    "template": "{1}d",
-    "icon": "ic_capsule_fire",
-    "timeoutSeconds": 180
-  },
-  {
     "package": "com.google.android.apps.nbu.paisa.user",
     "regex": "(?i)(?:received|credited with|sent you)\\D*₹?\\s*([\\d,]+(?:\\.\\d{2})?)",
     "template": "₹{1}",
@@ -29,10 +22,17 @@
   },
   {
     "package": "com.chess",
-    "regex": "(?i)(\\d+)\\s*(?:day streak|puzzle streak|streak)",
+    "regex": "(?i)(\\d+)[-\\s]*(?:day)?[-\\s]*streak",
     "template": "{1}d",
-    "icon": "ic_capsule_fire",
-    "timeoutSeconds": 180
+    "icon": "ic_capsule_flame",
+    "timeoutSeconds": 0
+  },
+  {
+    "package": "com.duolingo",
+    "regex": "(?i)(\\d+)[-\\s]*(?:day)?[-\\s]*streak",
+    "template": "{1}d",
+    "icon": "ic_capsule_flame",
+    "timeoutSeconds": 0
   },
   {
     "package": "com.matiks",
