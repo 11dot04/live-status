@@ -14,6 +14,16 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.RemoteViews
 import android.widget.TextView
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.ClipboardManager
+import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
+import java.util.Locale
 
 class LiveStatusNotificationListenerService : NotificationListenerService() {
     private val clockTimerTracker = ClockTimerTracker()
