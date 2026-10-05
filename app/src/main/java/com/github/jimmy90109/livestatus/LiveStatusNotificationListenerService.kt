@@ -201,20 +201,28 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         mediaPlaybackMonitor.onNotificationPosted(statusBarNotification)
 
         val notification = statusBarNotification.notification ?: return
-        val notificationText = readNotificationText(this, statusBarNotification.packageName, notification)
+        val packageName = statusBarNotification.packageName ?: ""
 
-        val title = readNotificationTitle(notification)
-        val contentText = readNotificationContentText(notification)
+        val rawNotificationText = readNotificationText(this, packageName, notification)
+        val notificationText = rawNotificationText?.toString() ?: ""
+
+        val rawTitle = readNotificationTitle(notification)
+        val title = rawTitle?.toString() ?: ""
+
+        val rawContentText = readNotificationContentText(notification)
+        val contentText = rawContentText?.toString() ?: ""
+
         val subText = notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
         val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
         val lines = notification.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-            ?.joinToString(" ") { it.toString() } ?: ""
+            ?.joinToString(" ") { it?.toString() ?: "" } ?: ""
+
         val fullText = listOf(title, contentText, subText, bigText, lines, notificationText)
             .filter { it.isNotBlank() }
             .distinct()
             .joinToString(" ")
 
-        // 1. Progress Hook
+        // 1. Direct Catch-all for System / Download / Upload Progress
         val maxProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
         val currentProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS, 0)
         val isIndeterminate = notification.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
@@ -223,10 +231,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             val percent = ((currentProgress.toDouble() / maxProgress) * 100).toInt().coerceIn(0, 100)
             val appLabel = try {
                 packageManager.getApplicationLabel(
-                    packageManager.getApplicationInfo(statusBarNotification.packageName, 0)
+                    packageManager.getApplicationInfo(packageName, 0)
                 ).toString()
             } catch (_: Exception) {
-                statusBarNotification.packageName
+                packageName
             }
 
             val fileDetail = when {
@@ -267,10 +275,8 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        // 3. Calendar Interceptor
-        if (statusBarNotification.packageName == "com.google.android.calendar" ||
-            statusBarNotification.packageName == "com.oplus.calendar") {
-
+        // 3. Direct Calendar Interceptor
+        if (packageName == "com.google.android.calendar" || packageName == "com.oplus.calendar") {
             val timeRegex = Regex("(\\d{1,2}):(\\d{2})")
             val match = timeRegex.find(fullText)
 
@@ -290,10 +296,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
         // 4. Custom Rules Engine (Evaluate Title First, then Full Text)
         val titleMatch = if (title.isNotBlank()) {
-            CustomRuleEngine.evaluate(statusBarNotification.packageName, title)
+            CustomRuleEngine.evaluate(packageName, title)
         } else null
 
-        val customMatch = titleMatch ?: CustomRuleEngine.evaluate(statusBarNotification.packageName, fullText)
+        val customMatch = titleMatch ?: CustomRuleEngine.evaluate(packageName, fullText)
 
         if (customMatch != null) {
             LiveStatusReminder.showCustomCapsule(
@@ -307,7 +313,6 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             )
             return
         }
-
         
         when (statusBarNotification.packageName) {
             CITYMAPPER_PACKAGE -> {
