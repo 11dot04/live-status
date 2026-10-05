@@ -1,12 +1,5 @@
 package com.github.jimmy90109.livestatus
 
-import android.content.Context
-import kotlinx.coroutines.*
-import java.util.Calendar
-
-object CalendarCountdownManager {
-package com.github.jimmy90109.livestatus
-
 import android.app.NotificationManager
 import android.content.Context
 import kotlinx.coroutines.*
