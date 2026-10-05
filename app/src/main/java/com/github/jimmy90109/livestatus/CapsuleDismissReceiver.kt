@@ -7,7 +7,8 @@ import android.content.Intent
 
 class CapsuleDismissReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val notificationId = intent.getIntExtra("notification_id", 9003)
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        notificationManager?.cancel(9002)
+        notificationManager?.cancel(notificationId)
     }
 }
