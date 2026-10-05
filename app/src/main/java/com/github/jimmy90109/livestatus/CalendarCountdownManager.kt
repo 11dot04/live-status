@@ -37,7 +37,10 @@ object CalendarCountdownManager {
 
         val appContext = context.applicationContext
 
-        countdownJob = CoroutineScope(Dispatchers.Main).launch {
+        // Run on background Default dispatcher so OS does not throttle Main
+        countdownJob = CoroutineScope(Dispatchers.Default).launch {
+            var lastReportedMinutes = -1
+
             while (isActive) {
                 val remainingMillis = target.timeInMillis - System.currentTimeMillis()
 
@@ -46,19 +49,27 @@ object CalendarCountdownManager {
                     break
                 }
 
-                val minutesLeft = (remainingMillis / 60000).toInt()
-                val pillText = if (minutesLeft > 0) "in ${minutesLeft}m" else "Now"
+                val minutesLeft = ((remainingMillis + 59_999L) / 60_000L).toInt()
 
-                LiveStatusReminder.showCustomCapsule(
-                    context = appContext,
-                    pillText = pillText,
-                    iconName = "ic_capsule_calendar",
-                    title = eventTitle,
-                    content = "Starts in $minutesLeft min",
-                    timeoutSeconds = 0 // Stays active between 30s updates without premature system teardown
-                )
+                // Only post updates when minute rolls over or on start
+                if (minutesLeft != lastReportedMinutes) {
+                    lastReportedMinutes = minutesLeft
+                    val pillText = if (minutesLeft > 1) "in ${minutesLeft}m" else "in 1m"
 
-                delay(30_000L)
+                    withContext(Dispatchers.Main) {
+                        LiveStatusReminder.showCustomCapsule(
+                            context = appContext,
+                            pillText = pillText,
+                            iconName = "ic_capsule_search",
+                            title = eventTitle,
+                            content = "Starts in $minutesLeft min",
+                            timeoutSeconds = 0
+                        )
+                    }
+                }
+
+                // Ticks every 10 seconds to detect the exact minute boundary promptly
+                delay(10_000L)
             }
         }
     }
