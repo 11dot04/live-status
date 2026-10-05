@@ -78,10 +78,13 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         val contentText = readNotificationContentText(notification) ?: ""
         val subText = notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
         val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
-        val fullText = listOf(title, contentText, subText, bigText, notificationText)
+        val lines = notification.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            ?.joinToString(" ") { it.toString() } ?: ""
+        val fullText = listOf(title, contentText, subText, bigText, lines, notificationText)
             .filter { it.isNotBlank() }
             .distinct()
             .joinToString(" ")
+
 
         // 1. Direct Catch-all for System & App Progress
         val maxProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
