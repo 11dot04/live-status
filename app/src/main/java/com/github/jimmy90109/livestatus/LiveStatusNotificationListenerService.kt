@@ -102,7 +102,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         }
 
         // 2. Direct Calendar Interceptor
-        if (statusBarNotification.packageName == "com.google.android.calendar" || 
+        if (statusBarNotification.packageName == "com.google.android.calendar" ||
             statusBarNotification.packageName == "com.oplus.calendar") {
 
             val timeRegex = Regex("(\\d{1,2}):(\\d{2})")
@@ -114,7 +114,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
                 CalendarCountdownManager.startCountdown(
                     context = this,
-                    eventTitle = if (title.isNotBlank()) title else "Event",
+                    eventTitle = if (title.isNotBlank()) title else "Calendar Event",
                     targetHour = hour,
                     targetMinute = minute
                 )
@@ -122,16 +122,20 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             }
         }
 
+        // 3. Fallback to custom_rules.json engine (evaluate title first, then fullText)
+        val titleMatch = if (title.isNotBlank()) {
+            CustomRuleEngine.evaluate(statusBarNotification.packageName, title)
+        } else null
 
-        // 3. Fallback to custom_rules.json engine
-        val customMatch = CustomRuleEngine.evaluate(statusBarNotification.packageName, fullText)
+        val customMatch = titleMatch ?: CustomRuleEngine.evaluate(statusBarNotification.packageName, fullText)
+
         if (customMatch != null) {
             LiveStatusReminder.showCustomCapsule(
                 context = this,
                 pillText = customMatch.pillText,
                 iconName = customMatch.iconName,
                 title = if (title.isNotBlank()) title else "Live Update",
-                content = fullText,
+                content = if (contentText.isNotBlank()) contentText else fullText,
                 timeoutSeconds = customMatch.timeoutSeconds
             )
             return
@@ -603,7 +607,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification) {
         super.onNotificationRemoved(statusBarNotification)
-        if (statusBarNotification?.packageName == "com.google.android.calendar" || 
+        if (statusBarNotification?.packageName == "com.google.android.calendar" ||
             statusBarNotification?.packageName == "com.oplus.calendar") {
             CalendarCountdownManager.stop(this)
         }
