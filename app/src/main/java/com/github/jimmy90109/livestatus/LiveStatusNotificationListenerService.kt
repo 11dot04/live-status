@@ -101,25 +101,27 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             return
         }
 
-        // 2. Direct Calendar Interceptor (Google Calendar & OnePlus/OPPO Calendar)
+        // 2. Direct Calendar Interceptor
         if (statusBarNotification.packageName == "com.google.android.calendar" || 
             statusBarNotification.packageName == "com.oplus.calendar") {
-            
-            // Matches: "15:15", "15:15–16:15", "in 10 min", "3:30 PM"
-            val timeRegex = Regex("(?i)(in\\s+\\d+\\s*(?:min|m|hr|h)|\\d{1,2}:\\d{2})")
-            val match = timeRegex.find(fullText)
-            val pillText = match?.value ?: "Event"
 
-            LiveStatusReminder.showCustomCapsule(
-                context = this,
-                pillText = pillText.take(10),
-                iconName = "ic_capsule_calendar",
-                title = if (title.isNotBlank()) title else "Calendar",
-                content = if (contentText.isNotBlank()) contentText else fullText,
-                timeoutSeconds = 30
-            )
-            return
+            val timeRegex = Regex("(\\d{1,2}):(\\d{2})")
+            val match = timeRegex.find(fullText)
+
+            if (match != null) {
+                val hour = match.groupValues[1].toInt()
+                val minute = match.groupValues[2].toInt()
+
+                CalendarCountdownManager.startCountdown(
+                    context = this,
+                    eventTitle = if (title.isNotBlank()) title else "Event",
+                    targetHour = hour,
+                    targetMinute = minute
+                )
+                return
+            }
         }
+
 
         // 3. Fallback to custom_rules.json engine
         val customMatch = CustomRuleEngine.evaluate(statusBarNotification.packageName, fullText)
@@ -600,6 +602,11 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification) {
+        super.onNotificationRemoved(statusBarNotification)
+        if (statusBarNotification?.packageName == "com.google.android.calendar" || 
+            statusBarNotification?.packageName == "com.oplus.calendar") {
+            CalendarCountdownManager.stop(this)
+        }
         mediaPlaybackMonitor.onNotificationRemoved(statusBarNotification)
         if (statusBarNotification.packageName == CITYMAPPER_PACKAGE) {
             if (BuildConfig.DEBUG) {
