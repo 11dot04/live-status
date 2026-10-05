@@ -913,29 +913,38 @@ object LiveStatusReminder {
         iconName: String?,
         title: String,
         content: String,
-        timeoutSeconds: Int
+        timeoutSeconds: Int,
+        customIcon: Icon? = null,
+        actions: List<Notification.Action> = emptyList()
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return
 
-        val iconResId = if (!iconName.isNullOrBlank()) {
+        val icon = customIcon ?: if (!iconName.isNullOrBlank()) {
             val resolvedId = context.resources.getIdentifier(iconName, "drawable", context.packageName)
-            if (resolvedId != 0) resolvedId else R.drawable.ic_notification
+            val resId = if (resolvedId != 0) resolvedId else R.drawable.ic_notification
+            Icon.createWithResource(context, resId)
         } else {
-            R.drawable.ic_notification
+            Icon.createWithResource(context, R.drawable.ic_notification)
         }
 
         val notificationId = 9002
 
         val builder = Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(iconResId)
+            .setSmallIcon(icon)
             .setContentTitle(title)
             .setContentText(content)
+            .setStyle(Notification.BigTextStyle().bigText(content))
             .setCategory(Notification.CATEGORY_STATUS)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setAutoCancel(true)
-            .setTimeoutAfter(timeoutSeconds * 1000L)
+
+        if (timeoutSeconds > 0) {
+            builder.setTimeoutAfter(timeoutSeconds * 1000L)
+        }
+
+        actions.forEach { builder.addAction(it) }
 
         builder.setShortCriticalText(pillText)
         builder.extras.putBoolean("android.ongoingActivity", true)
@@ -943,7 +952,6 @@ object LiveStatusReminder {
         requestPromotedOngoing(builder)
 
         notificationManager.notify(notificationId, builder.build())
-
     }
 
     internal fun showDiscordVoice(context: Context, update: DiscordVoiceUpdate) {
