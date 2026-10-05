@@ -42,6 +42,13 @@
     "timeoutSeconds": 180
   },
   {
+    "package": "app.getglobo.android",
+    "regex": "(?i)(\\d+)\\s*(?:day streak|days streak|streak)",
+    "template": "{1}d",
+    "icon": "ic_capsule_fire",
+    "timeoutSeconds": 180
+  },
+  {
     "package": "com.android.printspooler",
     "regex": "(?i)printing page (\\d+) of (\\d+)|printing",
     "template": "Page {1}/{2}",
