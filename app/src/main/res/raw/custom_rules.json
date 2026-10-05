@@ -55,4 +55,18 @@
     "icon": "ic_capsule_print",
     "timeoutSeconds": 30
   }
+    {
+    "package": "com.google.android.calendar",
+    "regex": "(?i)in\\s+(\\d+\\s*(?:min|m|hr|h))",
+    "template": "in {1}",
+    "icon": "ic_capsule_calendar",
+    "timeoutSeconds": 30
+  },
+  {
+    "package": "com.google.android.calendar",
+    "regex": "(\\d{1,2}:\\d{2}\\s*(?:AM|PM|am|pm)?)",
+    "template": "{1}",
+    "icon": "ic_capsule_calendar",
+    "timeoutSeconds": 30
+  }
 ]
