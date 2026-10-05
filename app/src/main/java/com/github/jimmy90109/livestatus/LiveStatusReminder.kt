@@ -915,7 +915,9 @@ object LiveStatusReminder {
         content: String,
         timeoutSeconds: Int,
         customIcon: Icon? = null,
-        actions: List<Notification.Action> = emptyList()
+        actions: List<Notification.Action> = emptyList(),
+        notificationId: Int = 9003,
+        chronometerTargetMillis: Long? = null
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return
@@ -928,8 +930,6 @@ object LiveStatusReminder {
             Icon.createWithResource(context, R.drawable.ic_notification)
         }
 
-        val notificationId = 9002
-
         val builder = Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(icon)
             .setContentTitle(title)
@@ -939,6 +939,13 @@ object LiveStatusReminder {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setAutoCancel(true)
+
+        if (chronometerTargetMillis != null) {
+            builder.setWhen(chronometerTargetMillis)
+                .setShowWhen(true)
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
+        }
 
         if (timeoutSeconds > 0) {
             builder.setTimeoutAfter(timeoutSeconds * 1000L)
@@ -953,6 +960,7 @@ object LiveStatusReminder {
 
         notificationManager.notify(notificationId, builder.build())
     }
+
 
     internal fun showDiscordVoice(context: Context, update: DiscordVoiceUpdate) {
         
