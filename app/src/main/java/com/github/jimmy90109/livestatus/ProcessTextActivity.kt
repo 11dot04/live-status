@@ -28,17 +28,24 @@ class ProcessTextActivity : Activity() {
             return
         }
 
-        // Strip punctuation like quotes, commas, periods
-        val cleanWord = rawText.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
+        // Clean out punctuation/whitespace and isolate target word
+        val cleanWord = rawText.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim().split("\\s+".toRegex()).firstOrNull() ?: ""
+
+        if (cleanWord.isBlank()) {
+            finish()
+            return
+        }
+
         val appContext = applicationContext
 
         thread {
             try {
                 val encoded = java.net.URLEncoder.encode(cleanWord.lowercase(), "UTF-8")
-                val apiUrl = URL("https://api.dictionaryapi.dev/api/v2/entries/en/$encoded")
+                // Datamuse API: lightweight, fast, returns definitions via md=d flag
+                val apiUrl = URL("https://api.datamuse.com/words?sp=$encoded&md=d&max=1")
                 val conn = (apiUrl.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 5000
-                    readTimeout = 5000
+                    connectTimeout = 8000
+                    readTimeout = 8000
                     requestMethod = "GET"
                     setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Mobile)")
                     setRequestProperty("Accept", "application/json")
@@ -46,40 +53,54 @@ class ProcessTextActivity : Activity() {
 
                 val code = conn.responseCode
                 if (code == 200) {
-                    val stream = BufferedReader(InputStreamReader(conn.inputStream))
-                    val response = stream.use { it.readText() }
-                    val jsonArray = JSONArray(response)
-                    val root = jsonArray.getJSONObject(0)
-                    val word = root.optString("word", cleanWord)
-                    val meanings = root.getJSONArray("meanings")
-                    val firstMeaning = meanings.getJSONObject(0)
-                    val partOfSpeech = firstMeaning.optString("partOfSpeech", "")
-                    val definitions = firstMeaning.getJSONArray("definitions")
-                    val definitionText = definitions.getJSONObject(0).getString("definition")
+                    val response = conn.inputStream.bufferedReader().use { it.readText() }
+                    val array = JSONArray(response)
 
-                    val pillLabel = if (partOfSpeech.isNotBlank()) {
-                        "${partOfSpeech.take(3)} • $word"
+                    if (array.length() > 0) {
+                        val firstEntry = array.getJSONObject(0)
+                        val word = firstEntry.optString("word", cleanWord)
+                        val defs = firstEntry.optJSONArray("defs")
+
+                        if (defs != null && defs.length() > 0) {
+                            // Datamuse formats definitions as: "n\tdefinition text" or "adj\tdefinition text"
+                            val rawDef = defs.getString(0)
+                            val parts = rawDef.split("\t", limit = 2)
+                            val partOfSpeech = if (parts.size > 1) parts[0].trim() else ""
+                            val definitionText = if (parts.size > 1) parts[1].trim() else parts[0].trim()
+
+                            val pillLabel = if (partOfSpeech.isNotBlank()) {
+                                "${partOfSpeech.take(3)} • $word"
+                            } else {
+                                word
+                            }
+
+                            mainHandler.post {
+                                LiveStatusReminder.showCustomCapsule(
+                                    context = appContext,
+                                    pillText = pillLabel.take(12),
+                                    iconName = "ic_capsule_search",
+                                    title = word.replaceFirstChar { it.uppercase() },
+                                    content = definitionText,
+                                    timeoutSeconds = 8
+                                )
+                            }
+                        } else {
+                            mainHandler.post {
+                                Toast.makeText(appContext, "No definition found", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     } else {
-                        word
-                    }
-
-                    mainHandler.post {
-                        LiveStatusReminder.showCustomCapsule(
-                            context = appContext,
-                            pillText = pillLabel.take(12),
-                            iconName = "ic_capsule_search",
-                            title = word.replaceFirstChar { it.uppercase() },
-                            content = definitionText,
-                            timeoutSeconds = 8
-                        )
+                        mainHandler.post {
+                            Toast.makeText(appContext, "Word not found", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 } else {
                     mainHandler.post {
-                        Toast.makeText(appContext, "Definition not found ($code)", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(appContext, "Lookup error ($code)", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
-                Log.e("ProcessText", "Error fetching word", e)
+                Log.e("ProcessText", "Lookup failure", e)
                 mainHandler.post {
                     Toast.makeText(appContext, "Network error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                 }
