@@ -4,7 +4,10 @@ import android.app.Activity
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Intent
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Bundle
@@ -24,6 +27,7 @@ import kotlin.concurrent.thread
 class ProcessTextActivity : Activity() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val INSPECT_NOTIFICATION_ID = 9003
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,7 +39,7 @@ class ProcessTextActivity : Activity() {
             return
         }
 
-        // 1. Color Preview (e.g., #FFF, #FFFFFF, 0xFFFFFF)
+        // 1. Color Preview (#FFF, #FFFFFF, etc.)
         val hexRegex = Regex("(?i)^#?([0-9a-f]{6}|[0-9a-f]{3})$")
         val hexMatch = hexRegex.find(rawText)
         if (hexMatch != null) {
@@ -43,7 +47,7 @@ class ProcessTextActivity : Activity() {
             return
         }
 
-        // 2. Inline Math / Arithmetic (e.g., 4+3, 12 * 8.5, 1250 / 4)
+        // 2. Inline Math (e.g. 4+3, 12 * 8.5)
         val mathRegex = Regex("""^\s*(-?\d+(?:\.\d+)?)\s*([\+\-\*\/xX×÷])\s*(-?\d+(?:\.\d+)?)\s*$""")
         val mathMatch = mathRegex.find(rawText)
         if (mathMatch != null) {
@@ -56,12 +60,12 @@ class ProcessTextActivity : Activity() {
             return
         }
 
-        // 3. Date / Countdown Inspector (e.g., "24 Oct", "2026-10-24", "24/10/2026")
+        // 3. Date / Countdown Inspector
         if (handleDateLookup(rawText)) {
             return
         }
 
-        // 4. Currency Converter ($50, 50 USD, €20, £15, etc.)
+        // 4. Currency Converter ($50, 50 USD, €20, etc.)
         val currencyRegex = Regex("(?i)^([$€£¥₹])?\\s*(\\d+(?:\\.\\d+)?)\\s*([a-z]{3})?$")
         val currMatch = currencyRegex.find(rawText)
         if (currMatch != null) {
@@ -74,21 +78,22 @@ class ProcessTextActivity : Activity() {
             }
         }
 
-        // 5. Fallback: Dictionary + Short Synonym
+        // 5. Fallback: Dictionary Lookup
         handleDictionaryLookup(rawText)
     }
 
     private fun getDismissAction(): Notification.Action {
-        val dismissIntent = PendingIntent.getBroadcast(
+        val dismissIntent = Intent(applicationContext, CapsuleDismissReceiver::class.java).apply {
+            putExtra("notification_id", INSPECT_NOTIFICATION_ID)
+        }
+        val pIntent = PendingIntent.getBroadcast(
             applicationContext,
-            9002,
-            Intent(applicationContext, CapsuleDismissReceiver::class.java),
+            INSPECT_NOTIFICATION_ID,
+            dismissIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        return Notification.Action.Builder(null, "Dismiss", dismissIntent).build()
+        return Notification.Action.Builder(null, "Dismiss", pIntent).build()
     }
-
-    // --- Dynamic Bitmaps ---
 
     private fun createColorDotIcon(colorInt: Int): Icon {
         val size = 64
@@ -101,29 +106,6 @@ class ProcessTextActivity : Activity() {
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
         return Icon.createWithBitmap(bitmap)
     }
-
-    private fun createRupeeIcon(): Icon {
-        val size = 64
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#1B5E20") // Dark green accent
-            style = Paint.Style.FILL
-        }
-        canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint)
-
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = 36f
-            typeface = Typeface.DEFAULT_BOLD
-            textAlign = Paint.Align.CENTER
-        }
-        val yPos = (canvas.height / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
-        canvas.drawText("₹", canvas.width / 2f, yPos, textPaint)
-        return Icon.createWithBitmap(bitmap)
-    }
-
-    // --- Modules ---
 
     private fun handleColorLookup(hexPart: String) {
         try {
@@ -139,13 +121,14 @@ class ProcessTextActivity : Activity() {
 
             LiveStatusReminder.showCustomCapsule(
                 context = applicationContext,
-                pillText = "#${fullHex.uppercase(Locale.ROOT)}",
+                pillText = "#${fullHex.lowercase(Locale.ROOT)}",
                 iconName = null,
-                title = "Color Swatch",
-                content = "RGB: ($r, $g, $b) • HEX: #${fullHex.uppercase(Locale.ROOT)}",
+                title = "color swatch",
+                content = "RGB: ($r, $g, $b) • HEX: #${fullHex.lowercase(Locale.ROOT)}",
                 timeoutSeconds = 15,
                 customIcon = createColorDotIcon(parsedColor),
-                actions = listOf(getDismissAction())
+                actions = listOf(getDismissAction()),
+                notificationId = INSPECT_NOTIFICATION_ID
             )
         } catch (_: Exception) {
             Toast.makeText(this, "Invalid Color", Toast.LENGTH_SHORT).show()
@@ -185,12 +168,13 @@ class ProcessTextActivity : Activity() {
 
             LiveStatusReminder.showCustomCapsule(
                 context = applicationContext,
-                pillText = "= $formatted",
-                iconName = "ic_capsule_search",
-                title = "Calculation",
+                pillText = formatted,
+                iconName = "ic_equals",
+                title = "calculation",
                 content = "$originalText = $formatted",
                 timeoutSeconds = 15,
-                actions = listOf(getDismissAction())
+                actions = listOf(getDismissAction()),
+                notificationId = INSPECT_NOTIFICATION_ID
             )
         }
         finish()
@@ -212,7 +196,6 @@ class ProcessTextActivity : Activity() {
                 val d = sdf.parse(cleanDateText)
                 if (d != null) {
                     val cal = Calendar.getInstance().apply { time = d }
-                    // Default to current year if omitted
                     if (!pattern.contains("y")) {
                         cal.set(Calendar.YEAR, now.get(Calendar.YEAR))
                         if (cal.before(now)) cal.add(Calendar.YEAR, 1)
@@ -229,10 +212,10 @@ class ProcessTextActivity : Activity() {
         val daysDiff = TimeUnit.MILLISECONDS.toDays(diffMillis).toInt()
 
         val pillText = when {
-            daysDiff == 0 -> "Today"
-            daysDiff == 1 -> "Tomorrow"
+            daysDiff == 0 -> "today"
+            daysDiff == 1 -> "tomorrow"
             daysDiff > 1 -> "in ${daysDiff}d"
-            daysDiff == -1 -> "Yesterday"
+            daysDiff == -1 -> "yesterday"
             else -> "${Math.abs(daysDiff)}d ago"
         }
 
@@ -242,10 +225,11 @@ class ProcessTextActivity : Activity() {
             context = applicationContext,
             pillText = pillText,
             iconName = "ic_capsule_search",
-            title = "Date Inspector",
+            title = "date",
             content = "$formattedDateDisplay ($pillText)",
             timeoutSeconds = 15,
-            actions = listOf(getDismissAction())
+            actions = listOf(getDismissAction()),
+            notificationId = INSPECT_NOTIFICATION_ID
         )
         finish()
         return true
@@ -264,7 +248,6 @@ class ProcessTextActivity : Activity() {
 
         thread {
             try {
-                // Free, open rates updated constantly against central bank daily feeds
                 val url = URL("https://open.er-api.com/v6/latest/$baseCurrency")
                 val conn = (url.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 4000
@@ -285,20 +268,18 @@ class ProcessTextActivity : Activity() {
                         String.format(Locale.ROOT, "%.2f", converted)
                     }
 
-                    // Save 3 characters by using ₹ symbol and custom Rupee icon
-                    val pill = if (isTargetInr) "≈ ₹$formatted" else "≈ $$formatted"
-                    val icon = if (isTargetInr) createRupeeIcon() else null
+                    val iconName = if (isTargetInr) "ic_rupee" else "ic_capsule_search"
 
                     mainHandler.post {
                         LiveStatusReminder.showCustomCapsule(
                             context = appContext,
-                            pillText = pill,
-                            iconName = if (icon == null) "ic_capsule_search" else null,
-                            title = "$amount $baseCurrency Conversion",
+                            pillText = formatted,
+                            iconName = iconName,
+                            title = "$amount $baseCurrency conversion".lowercase(Locale.ROOT),
                             content = "$amount $baseCurrency = ${if (isTargetInr) "₹" else "$"}$formatted",
                             timeoutSeconds = 20,
-                            customIcon = icon,
-                            actions = listOf(getDismissAction())
+                            actions = listOf(getDismissAction()),
+                            notificationId = INSPECT_NOTIFICATION_ID
                         )
                     }
                 }
@@ -311,20 +292,20 @@ class ProcessTextActivity : Activity() {
     }
 
     private fun handleDictionaryLookup(rawText: String) {
-        val cleanWord = rawText.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim().split("\\s+".toRegex()).firstOrNull() ?: ""
+        val originalWord = rawText.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim().split("\\s+".toRegex()).firstOrNull() ?: ""
 
-        if (cleanWord.isBlank()) {
+        if (originalWord.isBlank()) {
             finish()
             return
         }
 
+        val cleanWordLower = originalWord.lowercase(Locale.ROOT)
         val appContext = applicationContext
 
         thread {
             try {
-                val encoded = java.net.URLEncoder.encode(cleanWord.lowercase(Locale.ROOT), "UTF-8")
+                val encoded = java.net.URLEncoder.encode(cleanWordLower, "UTF-8")
 
-                // 1. Definition lookup
                 val defUrl = URL("https://api.datamuse.com/words?sp=$encoded&md=d&max=1")
                 val defConn = (defUrl.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 6000
@@ -363,10 +344,15 @@ class ProcessTextActivity : Activity() {
 
                 val cleanDefinition = definitionText
                     .replace(Regex("^\\([^)]*\\)\\s*"), "")
-                    .replaceFirstChar { it.uppercase() }
+                    .replaceFirstChar { it.lowercase() }
 
-                // 2. Fetch short synonym
-                val synUrl = URL("https://api.datamuse.com/words?rel_syn=$encoded&max=6")
+                val posConstraint = when (partOfSpeech) {
+                    "adj" -> "&lc=noun"
+                    "v" -> "&lc=to"
+                    else -> ""
+                }
+
+                val synUrl = URL("https://api.datamuse.com/words?rel_syn=$encoded$posConstraint&max=10")
                 val synConn = (synUrl.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 4000
                     readTimeout = 4000
@@ -379,26 +365,26 @@ class ProcessTextActivity : Activity() {
                     val synArray = JSONArray(synResp)
                     val synList = mutableListOf<String>()
                     for (i in 0 until synArray.length()) {
-                        val word = synArray.getJSONObject(i).optString("word")
-                        if (word.isNotBlank() && !word.contains(" ")) {
+                        val word = synArray.getJSONObject(i).optString("word").lowercase(Locale.ROOT)
+                        if (word.isNotBlank() && !word.contains(" ") && word != cleanWordLower) {
                             synList.add(word)
                         }
                     }
                     shortestSynonym = synList.filter { it.length <= 7 }.minByOrNull { it.length }
                 }
 
-                // Format: "adj • syn" or "n • word"
-                val displayWord = shortestSynonym ?: cleanWord
+                val baseWord = if (originalWord.all { it.isUpperCase() }) originalWord else cleanWordLower
+                val displayWord = shortestSynonym ?: baseWord
                 val posPrefix = if (partOfSpeech.isNotBlank()) "${partOfSpeech.take(3)} • " else ""
                 val pill = "$posPrefix$displayWord".take(12)
 
                 val webIntent = PendingIntent.getActivity(
                     appContext,
-                    cleanWord.hashCode(),
+                    cleanWordLower.hashCode(),
                     Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=define+$encoded")),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                val webAction = Notification.Action.Builder(null, "Dictionary", webIntent).build()
+                val webAction = Notification.Action.Builder(null, "dictionary", webIntent).build()
 
                 val wordCount = cleanDefinition.split("\\s+".toRegex()).size
                 val calculatedTimeout = (10 + (wordCount * 1.2)).toInt().coerceIn(15, 60)
@@ -408,17 +394,15 @@ class ProcessTextActivity : Activity() {
                         context = appContext,
                         pillText = pill,
                         iconName = "ic_capsule_search",
-                        title = "${cleanWord.replaceFirstChar { it.uppercase() }} ($partOfSpeech)",
+                        title = if (partOfSpeech.isNotBlank()) "$baseWord ($partOfSpeech)" else baseWord,
                         content = cleanDefinition,
                         timeoutSeconds = calculatedTimeout,
-                        actions = listOf(getDismissAction(), webAction)
+                        actions = listOf(getDismissAction(), webAction),
+                        notificationId = INSPECT_NOTIFICATION_ID
                     )
                 }
             } catch (e: Exception) {
                 Log.e("ProcessText", "Lookup error", e)
-                mainHandler.post {
-                    Toast.makeText(appContext, "Network error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                }
             } finally {
                 mainHandler.post { finish() }
             }
