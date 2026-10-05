@@ -55,7 +55,7 @@ object CalendarCountdownManager {
                     iconName = "ic_capsule_calendar",
                     title = eventTitle,
                     content = "Starts in $minutesLeft min",
-                    timeoutSeconds = 60
+                    timeoutSeconds = 0 // Stays active between 30s updates without premature system teardown
                 )
 
                 delay(30_000L)
