@@ -21,7 +21,6 @@ android {
                 keyPassword 'android'
             }
         }
-    }
 
     defaultConfig {
         applicationId = "com.github.jimmy90109.livestatus"
