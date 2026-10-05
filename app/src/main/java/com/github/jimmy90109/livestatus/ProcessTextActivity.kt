@@ -4,10 +4,7 @@ import android.app.Activity
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
+import android.graphics.*
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Bundle
@@ -16,9 +13,12 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import org.json.JSONArray
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.Locale
+import java.text.SimpleDateFormat
+import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 class ProcessTextActivity : Activity() {
@@ -35,7 +35,7 @@ class ProcessTextActivity : Activity() {
             return
         }
 
-        // 1. Color Preview (e.g. #FFF, #FFFFFF, 0xFFFFFF)
+        // 1. Color Preview (e.g., #FFF, #FFFFFF, 0xFFFFFF)
         val hexRegex = Regex("(?i)^#?([0-9a-f]{6}|[0-9a-f]{3})$")
         val hexMatch = hexRegex.find(rawText)
         if (hexMatch != null) {
@@ -43,7 +43,25 @@ class ProcessTextActivity : Activity() {
             return
         }
 
-        // 2. Quick Currency Converter (e.g., $50, 50 USD, €20, £15, ₹1200)
+        // 2. Inline Math / Arithmetic (e.g., 4+3, 12 * 8.5, 1250 / 4)
+        val mathRegex = Regex("""^\s*(-?\d+(?:\.\d+)?)\s*([\+\-\*\/xX×÷])\s*(-?\d+(?:\.\d+)?)\s*$""")
+        val mathMatch = mathRegex.find(rawText)
+        if (mathMatch != null) {
+            handleMathEvaluation(
+                mathMatch.groupValues[1],
+                mathMatch.groupValues[2],
+                mathMatch.groupValues[3],
+                rawText
+            )
+            return
+        }
+
+        // 3. Date / Countdown Inspector (e.g., "24 Oct", "2026-10-24", "24/10/2026")
+        if (handleDateLookup(rawText)) {
+            return
+        }
+
+        // 4. Currency Converter ($50, 50 USD, €20, £15, etc.)
         val currencyRegex = Regex("(?i)^([$€£¥₹])?\\s*(\\d+(?:\\.\\d+)?)\\s*([a-z]{3})?$")
         val currMatch = currencyRegex.find(rawText)
         if (currMatch != null) {
@@ -56,9 +74,21 @@ class ProcessTextActivity : Activity() {
             }
         }
 
-        // 3. Word Definition & Synonym Lookup
+        // 5. Fallback: Dictionary + Short Synonym
         handleDictionaryLookup(rawText)
     }
+
+    private fun getDismissAction(): Notification.Action {
+        val dismissIntent = PendingIntent.getBroadcast(
+            applicationContext,
+            9002,
+            Intent(applicationContext, CapsuleDismissReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return Notification.Action.Builder(null, "Dismiss", dismissIntent).build()
+    }
+
+    // --- Dynamic Bitmaps ---
 
     private fun createColorDotIcon(colorInt: Int): Icon {
         val size = 64
@@ -72,6 +102,29 @@ class ProcessTextActivity : Activity() {
         return Icon.createWithBitmap(bitmap)
     }
 
+    private fun createRupeeIcon(): Icon {
+        val size = 64
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#1B5E20") // Dark green accent
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint)
+
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 36f
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+        }
+        val yPos = (canvas.height / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
+        canvas.drawText("₹", canvas.width / 2f, yPos, textPaint)
+        return Icon.createWithBitmap(bitmap)
+    }
+
+    // --- Modules ---
+
     private fun handleColorLookup(hexPart: String) {
         try {
             val fullHex = if (hexPart.length == 3) {
@@ -83,15 +136,6 @@ class ProcessTextActivity : Activity() {
             val r = Color.red(parsedColor)
             val g = Color.green(parsedColor)
             val b = Color.blue(parsedColor)
-            val dotIcon = createColorDotIcon(parsedColor)
-
-            val dismissIntent = PendingIntent.getBroadcast(
-                applicationContext,
-                9002,
-                Intent(applicationContext, CapsuleDismissReceiver::class.java),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val dismissAction = Notification.Action.Builder(null, "Dismiss", dismissIntent).build()
 
             LiveStatusReminder.showCustomCapsule(
                 context = applicationContext,
@@ -100,14 +144,111 @@ class ProcessTextActivity : Activity() {
                 title = "Color Swatch",
                 content = "RGB: ($r, $g, $b) • HEX: #${fullHex.uppercase(Locale.ROOT)}",
                 timeoutSeconds = 15,
-                customIcon = dotIcon,
-                actions = listOf(dismissAction)
+                customIcon = createColorDotIcon(parsedColor),
+                actions = listOf(getDismissAction())
             )
         } catch (_: Exception) {
             Toast.makeText(this, "Invalid Color", Toast.LENGTH_SHORT).show()
         } finally {
             finish()
         }
+    }
+
+    private fun handleMathEvaluation(numA: String, rawOp: String, numB: String, originalText: String) {
+        val a = numA.toDoubleOrNull()
+        val b = numB.toDoubleOrNull()
+        if (a == null || b == null) {
+            finish()
+            return
+        }
+
+        val op = when (rawOp) {
+            "x", "X", "×" -> "*"
+            "÷" -> "/"
+            else -> rawOp
+        }
+
+        val result = when (op) {
+            "+" -> a + b
+            "-" -> a - b
+            "*" -> a * b
+            "/" -> if (b != 0.0) a / b else null
+            else -> null
+        }
+
+        if (result != null) {
+            val formatted = if (result % 1.0 == 0.0) {
+                result.toLong().toString()
+            } else {
+                String.format(Locale.ROOT, "%.3f", result).trimEnd('0').trimEnd('.')
+            }
+
+            LiveStatusReminder.showCustomCapsule(
+                context = applicationContext,
+                pillText = "= $formatted",
+                iconName = "ic_capsule_search",
+                title = "Calculation",
+                content = "$originalText = $formatted",
+                timeoutSeconds = 15,
+                actions = listOf(getDismissAction())
+            )
+        }
+        finish()
+    }
+
+    private fun handleDateLookup(rawText: String): Boolean {
+        val datePatterns = listOf(
+            "dd MMM yyyy", "dd MMMM yyyy", "dd MMM", "dd MMMM",
+            "yyyy-MM-dd", "dd/MM/yyyy", "dd-MM-yyyy", "MM/dd/yyyy"
+        )
+
+        val cleanDateText = rawText.trim()
+        val now = Calendar.getInstance()
+        var parsedDate: Date? = null
+
+        for (pattern in datePatterns) {
+            try {
+                val sdf = SimpleDateFormat(pattern, Locale.ENGLISH).apply { isLenient = false }
+                val d = sdf.parse(cleanDateText)
+                if (d != null) {
+                    val cal = Calendar.getInstance().apply { time = d }
+                    // Default to current year if omitted
+                    if (!pattern.contains("y")) {
+                        cal.set(Calendar.YEAR, now.get(Calendar.YEAR))
+                        if (cal.before(now)) cal.add(Calendar.YEAR, 1)
+                    }
+                    parsedDate = cal.time
+                    break
+                }
+            } catch (_: Exception) { }
+        }
+
+        if (parsedDate == null) return false
+
+        val diffMillis = parsedDate.time - now.timeInMillis
+        val daysDiff = TimeUnit.MILLISECONDS.toDays(diffMillis).toInt()
+
+        val pillText = when {
+            daysDiff == 0 -> "Today"
+            daysDiff == 1 -> "Tomorrow"
+            daysDiff > 1 -> "in ${daysDiff}d"
+            daysDiff == -1 -> "Yesterday"
+            else -> "${Math.abs(daysDiff)}d ago"
+        }
+
+        val formattedDateDisplay = SimpleDateFormat("EEE, dd MMM yyyy", Locale.getDefault()).format(parsedDate)
+
+        LiveStatusReminder.showCustomCapsule(
+            context = applicationContext,
+            pillText = pillText,
+            iconName = "ic_capsule_search",
+            title = "Date Inspector",
+            content = "$formattedDateDisplay ($pillText)",
+            timeoutSeconds = 15,
+            actions = listOf(getDismissAction())
+        )
+        finish()
+        return true
     }
 
     private fun handleCurrencyLookup(amount: Double, symbol: String, code: String) {
@@ -123,6 +264,7 @@ class ProcessTextActivity : Activity() {
 
         thread {
             try {
+                // Free, open rates updated constantly against central bank daily feeds
                 val url = URL("https://open.er-api.com/v6/latest/$baseCurrency")
                 val conn = (url.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 4000
@@ -131,37 +273,37 @@ class ProcessTextActivity : Activity() {
 
                 if (conn.responseCode == 200) {
                     val resp = conn.inputStream.bufferedReader().use { it.readText() }
-                    val rates = org.json.JSONObject(resp).getJSONObject("rates")
+                    val rates = JSONObject(resp).getJSONObject("rates")
 
                     val targetRate = if (baseCurrency == "INR") rates.optDouble("USD", 0.0) else rates.optDouble("INR", 0.0)
-                    val targetCode = if (baseCurrency == "INR") "USD" else "INR"
+                    val isTargetInr = baseCurrency != "INR"
                     val converted = amount * targetRate
 
-                    val formattedTarget = String.format(Locale.ROOT, "%.2f", converted)
-                    val pill = "≈ $targetCode $formattedTarget"
+                    val formatted = if (converted >= 100) {
+                        String.format(Locale.ROOT, "%.0f", converted)
+                    } else {
+                        String.format(Locale.ROOT, "%.2f", converted)
+                    }
 
-                    val dismissIntent = PendingIntent.getBroadcast(
-                        appContext,
-                        9002,
-                        Intent(appContext, CapsuleDismissReceiver::class.java),
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                    )
-                    val dismissAction = Notification.Action.Builder(null, "Dismiss", dismissIntent).build()
+                    // Save 3 characters by using ₹ symbol and custom Rupee icon
+                    val pill = if (isTargetInr) "≈ ₹$formatted" else "≈ $$formatted"
+                    val icon = if (isTargetInr) createRupeeIcon() else null
 
                     mainHandler.post {
                         LiveStatusReminder.showCustomCapsule(
                             context = appContext,
-                            pillText = pill.take(12),
-                            iconName = "ic_capsule_payment",
+                            pillText = pill,
+                            iconName = if (icon == null) "ic_capsule_search" else null,
                             title = "$amount $baseCurrency Conversion",
-                            content = "$amount $baseCurrency = $targetCode $formattedTarget",
+                            content = "$amount $baseCurrency = ${if (isTargetInr) "₹" else "$"}$formatted",
                             timeoutSeconds = 20,
-                            actions = listOf(dismissAction)
+                            customIcon = icon,
+                            actions = listOf(getDismissAction())
                         )
                     }
                 }
             } catch (e: Exception) {
-                Log.e("ProcessText", "Currency conversion failed", e)
+                Log.e("ProcessText", "Forex error", e)
             } finally {
                 mainHandler.post { finish() }
             }
@@ -219,13 +361,12 @@ class ProcessTextActivity : Activity() {
                     return@thread
                 }
 
-                // Strip domain/parenthetical clutter from the front
                 val cleanDefinition = definitionText
                     .replace(Regex("^\\([^)]*\\)\\s*"), "")
                     .replaceFirstChar { it.uppercase() }
 
-                // 2. Shortest synonym lookup for pill
-                val synUrl = URL("https://api.datamuse.com/words?rel_syn=$encoded&max=5")
+                // 2. Fetch short synonym
+                val synUrl = URL("https://api.datamuse.com/words?rel_syn=$encoded&max=6")
                 val synConn = (synUrl.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 4000
                     readTimeout = 4000
@@ -243,40 +384,22 @@ class ProcessTextActivity : Activity() {
                             synList.add(word)
                         }
                     }
-                    shortestSynonym = synList.filter { it.length <= 9 }.minByOrNull { it.length }
+                    shortestSynonym = synList.filter { it.length <= 7 }.minByOrNull { it.length }
                 }
 
-                val pill = if (!shortestSynonym.isNullOrBlank()) {
-                    "≈ $shortestSynonym"
-                } else {
-                    cleanWord.take(10)
-                }
+                // Format: "adj • syn" or "n • word"
+                val displayWord = shortestSynonym ?: cleanWord
+                val posPrefix = if (partOfSpeech.isNotBlank()) "${partOfSpeech.take(3)} • " else ""
+                val pill = "$posPrefix$displayWord".take(12)
 
-                val titleFormatted = if (partOfSpeech.isNotBlank()) {
-                    "${cleanWord.replaceFirstChar { it.uppercase() }} ($partOfSpeech)"
-                } else {
-                    cleanWord.replaceFirstChar { it.uppercase() }
-                }
-
-                // Action 1: Dismiss
-                val dismissIntent = PendingIntent.getBroadcast(
-                    appContext,
-                    9002,
-                    Intent(appContext, CapsuleDismissReceiver::class.java),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                val dismissAction = Notification.Action.Builder(null, "Dismiss", dismissIntent).build()
-
-                // Action 2: Open full Google definition in browser
                 val webIntent = PendingIntent.getActivity(
                     appContext,
                     cleanWord.hashCode(),
                     Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=define+$encoded")),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                val webAction = Notification.Action.Builder(null, "Full Dictionary", webIntent).build()
+                val webAction = Notification.Action.Builder(null, "Dictionary", webIntent).build()
 
-                // Adaptive reading time: 10s baseline + 1.2s per word
                 val wordCount = cleanDefinition.split("\\s+".toRegex()).size
                 val calculatedTimeout = (10 + (wordCount * 1.2)).toInt().coerceIn(15, 60)
 
@@ -285,10 +408,10 @@ class ProcessTextActivity : Activity() {
                         context = appContext,
                         pillText = pill,
                         iconName = "ic_capsule_search",
-                        title = titleFormatted,
+                        title = "${cleanWord.replaceFirstChar { it.uppercase() }} ($partOfSpeech)",
                         content = cleanDefinition,
                         timeoutSeconds = calculatedTimeout,
-                        actions = listOf(dismissAction, webAction)
+                        actions = listOf(getDismissAction(), webAction)
                     )
                 }
             } catch (e: Exception) {
