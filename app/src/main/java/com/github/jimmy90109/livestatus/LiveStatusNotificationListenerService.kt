@@ -24,6 +24,10 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import java.util.Locale
+import android.Manifest
+import android.content.pm.PackageManager
+import android.util.Log
+import androidx.core.content.ContextCompat
 
 class LiveStatusNotificationListenerService : NotificationListenerService() {
     private val clockTimerTracker = ClockTimerTracker()
@@ -60,9 +64,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             },
         )
     }
+    
     private var lastMediaTrack: String? = null
-    private var wasVpnConnected = false
     private var lastRingerMode: Int? = null
+    private var wasVpnConnected = false
 
     private val ringerReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -70,7 +75,6 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                 val currentMode = audioManager.ringerMode
 
-                // Ignore the initial sticky broadcast when registering
                 if (lastRingerMode == null) {
                     lastRingerMode = currentMode
                     return
@@ -101,14 +105,29 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
     private val bluetoothReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+            val device = try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                }
+            } catch (_: Exception) {
+                null
             } ?: return
 
-            val deviceName = try { device.name ?: "Device" } catch (_: SecurityException) { "Device" }
+            val hasBtPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+
+            val deviceName = if (hasBtPermission) {
+                try {
+                    device.name ?: "Bluetooth Device"
+                } catch (_: SecurityException) {
+                    "Bluetooth Device"
+                }
+            } else {
+                "Bluetooth Device"
+            }
 
             when (intent.action) {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> {
@@ -169,6 +188,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             }
         }
     }
+
     private var lastUberRideUpdate =
         LiveStatusNotificationParser.UberRideUpdate(LiveStatusNotificationParser.UberRideEvent.NONE)
     private val uberEatsTracker = UberEatsTracker()
@@ -223,120 +243,124 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         super.onNotificationPosted(statusBarNotification)
         if (statusBarNotification == null) return
 
-        mediaPlaybackMonitor.onNotificationPosted(statusBarNotification)
+        try {
+            mediaPlaybackMonitor.onNotificationPosted(statusBarNotification)
 
-        val notification = statusBarNotification.notification ?: return
-        val packageName = statusBarNotification.packageName ?: ""
+            val notification = statusBarNotification.notification ?: return
+            val packageName = statusBarNotification.packageName ?: ""
 
-        val rawNotificationText = readNotificationText(this, packageName, notification)
-        val notificationText = rawNotificationText?.toString() ?: ""
+            val rawNotificationText = readNotificationText(this, packageName, notification)
+            val notificationText = rawNotificationText?.toString() ?: ""
 
-        val rawTitle = readNotificationTitle(notification)
-        val title = rawTitle?.toString() ?: ""
+            val rawTitle = readNotificationTitle(notification)
+            val title = rawTitle?.toString() ?: ""
 
-        val rawContentText = readNotificationContentText(notification)
-        val contentText = rawContentText?.toString() ?: ""
+            val rawContentText = readNotificationContentText(notification)
+            val contentText = rawContentText?.toString() ?: ""
 
-        val subText = notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
-        val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
-        val lines = notification.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-            ?.joinToString(" ") { it?.toString() ?: "" } ?: ""
+            val subText = notification.extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
+            val bigText = notification.extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
+            val lines = notification.extras?.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+                ?.joinToString(" ") { it?.toString() ?: "" } ?: ""
 
-        val fullText = listOf(title, contentText, subText, bigText, lines, notificationText)
-            .filter { it.isNotBlank() }
-            .distinct()
-            .joinToString(" ")
+            val fullText = listOf(title, contentText, subText, bigText, lines, notificationText)
+                .filter { it.isNotBlank() }
+                .distinct()
+                .joinToString(" ")
 
-        // 1. Direct Catch-all for System / Download / Upload Progress
-        val maxProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
-        val currentProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS, 0)
-        val isIndeterminate = notification.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
+            // 1. Direct Catch-all for System / Download / Upload Progress
+            val maxProgress = notification.extras?.getInt(Notification.EXTRA_PROGRESS_MAX, 0) ?: 0
+            val currentProgress = notification.extras?.getInt(Notification.EXTRA_PROGRESS, 0) ?: 0
+            val isIndeterminate = notification.extras?.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false) ?: false
 
-        if (maxProgress > 0 && !isIndeterminate) {
-            val percent = ((currentProgress.toDouble() / maxProgress) * 100).toInt().coerceIn(0, 100)
-            val appLabel = try {
-                packageManager.getApplicationLabel(
-                    packageManager.getApplicationInfo(packageName, 0)
-                ).toString()
-            } catch (_: Exception) {
-                packageName
-            }
+            if (maxProgress > 0 && !isIndeterminate) {
+                val percent = ((currentProgress.toDouble() / maxProgress) * 100).toInt().coerceIn(0, 100)
+                val appLabel = try {
+                    packageManager.getApplicationLabel(
+                        packageManager.getApplicationInfo(packageName, 0)
+                    ).toString()
+                } catch (_: Exception) {
+                    packageName
+                }
 
-            val fileDetail = when {
-                contentText.isNotBlank() && !contentText.matches(Regex("""^\d+[\s/]+\d+$""")) -> contentText
-                bigText.isNotBlank() -> bigText
-                title.isNotBlank() && title != appLabel -> title
-                else -> "$currentProgress / $maxProgress"
-            }
+                val fileDetail = when {
+                    contentText.isNotBlank() && !contentText.matches(Regex("""^\d+[\s/]+\d+$""")) -> contentText
+                    bigText.isNotBlank() -> bigText
+                    title.isNotBlank() && title != appLabel -> title
+                    else -> "$currentProgress / $maxProgress"
+                }
 
-            LiveStatusReminder.showCustomCapsule(
-                context = this,
-                pillText = "$percent%",
-                iconName = "ic_capsule_download",
-                title = "$appLabel ($percent%)",
-                content = fileDetail,
-                timeoutSeconds = 0,
-                notificationId = 9005
-            )
-            return
-        }
-
-        // 2. Track Change Hook
-        val isMedia = notification.category == Notification.CATEGORY_TRANSPORT ||
-                      notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
-        if (isMedia && title.isNotBlank()) {
-            val trackIdentifier = "$title - $contentText"
-            if (trackIdentifier != lastMediaTrack) {
-                lastMediaTrack = trackIdentifier
                 LiveStatusReminder.showCustomCapsule(
                     context = this,
-                    pillText = title.take(12).lowercase(Locale.ROOT),
-                    iconName = "ic_music_notification",
-                    title = title.lowercase(Locale.ROOT),
-                    content = if (contentText.isNotBlank()) contentText else "now playing",
-                    timeoutSeconds = 5,
-                    notificationId = 9006
-                )
-            }
-        }
-
-        // 3. Direct Calendar Interceptor
-        if (packageName == "com.google.android.calendar" || packageName == "com.oplus.calendar") {
-            val timeRegex = Regex("(\\d{1,2}):(\\d{2})")
-            val match = timeRegex.find(fullText)
-
-            if (match != null) {
-                val hour = match.groupValues[1].toInt()
-                val minute = match.groupValues[2].toInt()
-
-                CalendarCountdownManager.startCountdown(
-                    context = this,
-                    eventTitle = if (title.isNotBlank()) title else "calendar event",
-                    targetHour = hour,
-                    targetMinute = minute
+                    pillText = "$percent%",
+                    iconName = "ic_capsule_download",
+                    title = "$appLabel ($percent%)",
+                    content = fileDetail,
+                    timeoutSeconds = 0,
+                    notificationId = 9005
                 )
                 return
             }
-        }
 
-        // 4. Custom Rules Engine (Evaluate Title First, then Full Text)
-        val titleMatch = if (title.isNotBlank()) {
-            CustomRuleEngine.evaluate(packageName, title)
-        } else null
+            // 2. Track Change Hook
+            val isMedia = notification.category == Notification.CATEGORY_TRANSPORT ||
+                          notification.extras?.containsKey(Notification.EXTRA_MEDIA_SESSION) == true
+            if (isMedia && title.isNotBlank()) {
+                val trackIdentifier = "$title - $contentText"
+                if (trackIdentifier != lastMediaTrack) {
+                    lastMediaTrack = trackIdentifier
+                    LiveStatusReminder.showCustomCapsule(
+                        context = this,
+                        pillText = title.take(12).lowercase(Locale.ROOT),
+                        iconName = "ic_music_notification",
+                        title = title.lowercase(Locale.ROOT),
+                        content = if (contentText.isNotBlank()) contentText else "now playing",
+                        timeoutSeconds = 5,
+                        notificationId = 9006
+                    )
+                }
+            }
 
-        val customMatch = titleMatch ?: CustomRuleEngine.evaluate(packageName, fullText)
+            // 3. Direct Calendar Interceptor
+            if (packageName == "com.google.android.calendar" || packageName == "com.oplus.calendar") {
+                val timeRegex = Regex("(\\d{1,2}):(\\d{2})")
+                val match = timeRegex.find(fullText)
 
-        if (customMatch != null) {
-            LiveStatusReminder.showCustomCapsule(
-                context = this,
-                pillText = customMatch.pillText,
-                iconName = customMatch.iconName,
-                title = if (title.isNotBlank()) title else "live update",
-                content = if (contentText.isNotBlank()) contentText else fullText,
-                timeoutSeconds = customMatch.timeoutSeconds,
-                notificationId = 9004
-            )
-            return
+                if (match != null) {
+                    val hour = match.groupValues[1].toInt()
+                    val minute = match.groupValues[2].toInt()
+
+                    CalendarCountdownManager.startCountdown(
+                        context = this,
+                        eventTitle = if (title.isNotBlank()) title else "calendar event",
+                        targetHour = hour,
+                        targetMinute = minute
+                    )
+                    return
+                }
+            }
+
+            // 4. Custom Rules Engine
+            val titleMatch = if (title.isNotBlank()) {
+                CustomRuleEngine.evaluate(packageName, title)
+            } else null
+
+            val customMatch = titleMatch ?: CustomRuleEngine.evaluate(packageName, fullText)
+
+            if (customMatch != null) {
+                LiveStatusReminder.showCustomCapsule(
+                    context = this,
+                    pillText = customMatch.pillText,
+                    iconName = customMatch.iconName,
+                    title = if (title.isNotBlank()) title else "live update",
+                    content = if (contentText.isNotBlank()) contentText else fullText,
+                    timeoutSeconds = customMatch.timeoutSeconds,
+                    notificationId = 9004
+                )
+                return
+            }
+        } catch (e: Exception) {
+            Log.e("LiveStatus", "Error processing notification", e)
         }
         
         when (statusBarNotification.packageName) {
