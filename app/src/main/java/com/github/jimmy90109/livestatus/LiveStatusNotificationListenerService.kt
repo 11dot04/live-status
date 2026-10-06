@@ -216,6 +216,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
     
     override fun onCreate() {
         super.onCreate()
+        CustomRuleEngine.loadRules(this)
 
         val exportFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Context.RECEIVER_EXPORTED
