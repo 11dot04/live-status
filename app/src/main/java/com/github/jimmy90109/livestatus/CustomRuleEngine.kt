@@ -75,18 +75,13 @@ object CustomRuleEngine {
         }
     }
 
-    fun evaluate(context: Context, packageName: String, rawText: String): MatchResult? {
-        if (!isLoaded) {
-            loadRules(context)
-        }
-
+    fun evaluate(packageName: String, rawText: String): MatchResult? {
         for (rule in rules) {
             if (rule.packageName.equals(packageName, ignoreCase = true)) {
                 try {
                     val match = rule.regex.find(rawText)
                     if (match != null) {
                         var pill = rule.pillTextTemplate
-                        // Replace $0, $1, $2 with regex capture groups
                         match.groupValues.forEachIndexed { index, value ->
                             pill = pill.replace("$$index", value)
                         }
@@ -97,9 +92,7 @@ object CustomRuleEngine {
                         )
                     }
                 } catch (evalEx: Exception) {
-                    val err = "Eval error on ${rule.packageName}: ${evalEx.localizedMessage}"
-                    Log.e(TAG, err, evalEx)
-                    showToastError(context, err)
+                    Log.e(TAG, "Eval error on ${rule.packageName}", evalEx)
                 }
             }
         }
