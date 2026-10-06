@@ -38,8 +38,15 @@ object CustomRuleEngine {
     fun loadRules(context: Context) {
         if (isLoaded) return
         try {
-            val assetManager = context.assets
-            val inputStream = assetManager.open("custom_rules.json")
+            val resId = context.resources.getIdentifier("custom_rules", "raw", context.packageName)
+            if (resId == 0) {
+                val err = "Resource 'custom_rules' not found in res/raw/"
+                Log.e(TAG, err)
+                showToastError(context, err)
+                return
+            }
+
+            val inputStream = context.resources.openRawResource(resId)
             val jsonString = InputStreamReader(inputStream).use { it.readText() }
 
             val jsonArray = JSONArray(jsonString)
@@ -62,7 +69,7 @@ object CustomRuleEngine {
             }
             isLoaded = true
         } catch (e: Exception) {
-            val err = "Failed reading custom_rules.json: ${e.localizedMessage}"
+            val err = "Failed reading raw/custom_rules: ${e.localizedMessage}"
             Log.e(TAG, err, e)
             showToastError(context, err)
         }
@@ -79,6 +86,7 @@ object CustomRuleEngine {
                     val match = rule.regex.find(rawText)
                     if (match != null) {
                         var pill = rule.pillTextTemplate
+                        // Replace $0, $1, $2 with regex capture groups
                         match.groupValues.forEachIndexed { index, value ->
                             pill = pill.replace("$$index", value)
                         }
