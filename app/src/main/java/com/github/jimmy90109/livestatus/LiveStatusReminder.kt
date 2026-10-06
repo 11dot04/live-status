@@ -11,6 +11,7 @@ import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.SystemClock
+import com.github.jimmy90109.livestatus.InspectDetailActivity
 import com.github.jimmy90109.livestatus.ui.home.HomeScreenHostActivity
 import com.github.jimmy90109.livestatus.ui.home.YouBikeRegionPickerActivity
 import java.text.BreakIterator
