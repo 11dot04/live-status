@@ -291,7 +291,7 @@ class ProcessTextActivity : Activity() {
         LiveStatusReminder.showCustomCapsule(
             context = applicationContext,
             pillText = found.second.split(" ").take(3).joinToString(" "),
-            iconName = "ic_capsule_search",
+            iconName = "ic_functions",
             title = found.first,
             content = "${found.second} • ${found.third}",
             timeoutSeconds = 15,
@@ -337,7 +337,7 @@ class ProcessTextActivity : Activity() {
         LiveStatusReminder.showCustomCapsule(
             context = applicationContext,
             pillText = pillStr,
-            iconName = "ic_capsule_search",
+            iconName = "ic_science",
             title = "$text Molar Mass",
             content = "$pillStr • Mass breakdown available in details",
             timeoutSeconds = 15,
@@ -373,7 +373,7 @@ class ProcessTextActivity : Activity() {
         LiveStatusReminder.showCustomCapsule(
             context = applicationContext,
             pillText = drugClass.split(" ").first(),
-            iconName = "ic_capsule_search",
+            iconName = "ic_medication",
             title = "${word.replaceFirstChar { it.uppercase() }} ($drugClass)",
             content = mech,
             timeoutSeconds = 15,
@@ -410,7 +410,7 @@ class ProcessTextActivity : Activity() {
         LiveStatusReminder.showCustomCapsule(
             context = applicationContext,
             pillText = commonName,
-            iconName = "ic_capsule_search",
+            iconName = "ic_eco",
             title = "$cleaned ($commonName)",
             content = "Family: $family • $notes",
             timeoutSeconds = 15,
