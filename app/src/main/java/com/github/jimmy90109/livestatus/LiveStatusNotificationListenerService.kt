@@ -197,43 +197,55 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         super.onCreate()
 
         val exportFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Context.RECEIVER_NOT_EXPORTED
+            Context.RECEIVER_EXPORTED
         } else {
             0
         }
 
-        registerReceiver(ringerReceiver, IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION), exportFlag)
-
-        val btFilter = IntentFilter().apply {
-            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
-            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        try {
+            registerReceiver(ringerReceiver, IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION), exportFlag)
+        } catch (e: Exception) {
+            Log.e("LiveStatus", "Failed ringer registration", e)
         }
-        registerReceiver(bluetoothReceiver, btFilter, exportFlag)
-
-        registerReceiver(vpnReceiver, IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION), exportFlag)
 
         try {
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.addPrimaryClipChangedListener {
-                val clip = clipboard.primaryClip
-                if (clip != null && clip.itemCount > 0) {
-                    val text = clip.getItemAt(0).coerceToText(this).toString().trim()
-                    if (text.isNotBlank()) {
-                        LiveStatusReminder.showCustomCapsule(
-                            context = this,
-                            pillText = "copied",
-                            iconName = "ic_capsule_search",
-                            title = "clipboard",
-                            content = text.take(120),
-                            timeoutSeconds = 3,
-                            notificationId = 9010
-                        )
-                    }
-                }
+            val btFilter = IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+                addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
             }
+            registerReceiver(bluetoothReceiver, btFilter, exportFlag)
         } catch (e: Exception) {
-            // Ignore background clipboard access restriction if app not in foreground
+            Log.e("LiveStatus", "Failed bluetooth registration", e)
         }
+
+        try {
+            registerReceiver(vpnReceiver, IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION), exportFlag)
+        } catch (e: Exception) {
+            Log.e("LiveStatus", "Failed vpn registration", e)
+        }
+
+        try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            clipboard?.addPrimaryClipChangedListener {
+                try {
+                    val clip = clipboard.primaryClip
+                    if (clip != null && clip.itemCount > 0) {
+                        val text = clip.getItemAt(0)?.coerceToText(this)?.toString()?.trim() ?: ""
+                        if (text.isNotBlank()) {
+                            LiveStatusReminder.showCustomCapsule(
+                                context = this,
+                                pillText = "copied",
+                                iconName = "ic_capsule_search",
+                                title = "clipboard",
+                                content = text.take(120),
+                                timeoutSeconds = 3,
+                                notificationId = 9010
+                            )
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
 
 
         AppReminderPreferences.registerListener(this, citymapperPreferenceListener)
@@ -949,10 +961,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         handleCitymapperDecision(citymapperTracker.reset())
         stopClockTimerRefresh()
         mediaPlaybackMonitor.stop()
+        try { unregisterReceiver(ringerReceiver) } catch (_: Exception) {}
+        try { unregisterReceiver(bluetoothReceiver) } catch (_: Exception) {}
+        try { unregisterReceiver(vpnReceiver) } catch (_: Exception) {}
         super.onDestroy()
-        unregisterReceiver(ringerReceiver)
-        unregisterReceiver(bluetoothReceiver)
-        unregisterReceiver(vpnReceiver)
     }
     
     override fun onListenerConnected() {
