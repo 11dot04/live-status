@@ -255,32 +255,32 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
         super.onNotificationPosted(statusBarNotification)
         if (statusBarNotification == null) return
 
+        mediaPlaybackMonitor.onNotificationPosted(statusBarNotification)
+
+        val notification = statusBarNotification.notification ?: return
+        val packageName = statusBarNotification.packageName ?: ""
+
+        val rawNotificationText = readNotificationText(this, packageName, notification)
+        val notificationText = rawNotificationText?.toString() ?: ""
+
+        val rawTitle = readNotificationTitle(notification)
+        val title = rawTitle?.toString() ?: ""
+
+        val rawContentText = readNotificationContentText(notification)
+        val contentText = rawContentText?.toString() ?: ""
+
+        val subText = notification.extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
+        val bigText = notification.extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
+        val lines = notification.extras?.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            ?.joinToString(" ") { it?.toString() ?: "" } ?: ""
+
+        val fullText = listOf(title, contentText, subText, bigText, lines, notificationText)
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" ")
+
         try {
-            mediaPlaybackMonitor.onNotificationPosted(statusBarNotification)
-
-            val notification = statusBarNotification.notification ?: return
-            val packageName = statusBarNotification.packageName ?: ""
-
-            val rawNotificationText = readNotificationText(this, packageName, notification)
-            val notificationText = rawNotificationText?.toString() ?: ""
-
-            val rawTitle = readNotificationTitle(notification)
-            val title = rawTitle?.toString() ?: ""
-
-            val rawContentText = readNotificationContentText(notification)
-            val contentText = rawContentText?.toString() ?: ""
-
-            val subText = notification.extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
-            val bigText = notification.extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
-            val lines = notification.extras?.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-                ?.joinToString(" ") { it?.toString() ?: "" } ?: ""
-
-            val fullText = listOf(title, contentText, subText, bigText, lines, notificationText)
-                .filter { it.isNotBlank() }
-                .distinct()
-                .joinToString(" ")
-
-            // 1. Direct Catch-all for System / Download / Upload Progress
+            // 1. Progress Hook
             val maxProgress = notification.extras?.getInt(Notification.EXTRA_PROGRESS_MAX, 0) ?: 0
             val currentProgress = notification.extras?.getInt(Notification.EXTRA_PROGRESS, 0) ?: 0
             val isIndeterminate = notification.extras?.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false) ?: false
@@ -333,7 +333,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 }
             }
 
-            // 3. Direct Calendar Interceptor
+            // 3. Calendar Interceptor
             if (packageName == "com.google.android.calendar" || packageName == "com.oplus.calendar") {
                 val timeRegex = Regex("(\\d{1,2}):(\\d{2})")
                 val match = timeRegex.find(fullText)
@@ -372,8 +372,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 return
             }
         } catch (e: Exception) {
-            Log.e("LiveStatus", "Error processing notification", e)
+            Log.e("LiveStatus", "Error processing notification hooks", e)
         }
+
+        // --- Jimmy's original downstream parser checks resume here ---
         
         when (statusBarNotification.packageName) {
             CITYMAPPER_PACKAGE -> {
