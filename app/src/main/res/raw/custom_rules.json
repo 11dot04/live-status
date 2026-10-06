@@ -76,4 +76,25 @@
     "icon": "ic_capsule_calendar",
     "timeoutSeconds": 30
   }
+  {
+    "package_name": "com.coloros.weather",
+    "regex": "(?i)(\\d{1,2}°(?:[CF])?)(?:\\s*[-·•,]?\\s*([a-zA-Z\\s]{3,15}))?",
+    "pill_text": "$1",
+    "icon_name": "ic_weather_sunny",
+    "timeout_seconds": 0
+  },
+  {
+    "package_name": "com.coloros.weather.service",
+    "regex": "(?i)(\\d{1,2}°(?:[CF])?)(?:\\s*[-·•,]?\\s*([a-zA-Z\\s]{3,15}))?",
+    "pill_text": "$1",
+    "icon_name": "ic_weather_sunny",
+    "timeout_seconds": 0
+  },
+  {
+    "package_name": "com.google.android.googlequicksearchbox",
+    "regex": "(?i)(\\d{1,2}°(?:[CF])?)(?:\\s*[-·•,]?\\s*([a-zA-Z\\s]{3,15}))?",
+    "pill_text": "$1",
+    "icon_name": "ic_weather_sunny",
+    "timeout_seconds": 0
+  }
 ]
