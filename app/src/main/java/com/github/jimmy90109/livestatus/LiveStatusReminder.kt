@@ -992,6 +992,7 @@ object LiveStatusReminder {
                 putExtra("EXTRA_COPY_PAYLOAD", detailPayload.copyText)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
+
             val detailPendingIntent = PendingIntent.getActivity(
                 context,
                 notificationId + 1000,
