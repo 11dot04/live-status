@@ -62,12 +62,24 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
     }
     private var lastMediaTrack: String? = null
     private var wasVpnConnected = false
+    private var lastRingerMode: Int? = null
 
     private val ringerReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == AudioManager.RINGER_MODE_CHANGED_ACTION) {
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                val (modeName, iconName) = when (audioManager.ringerMode) {
+                val currentMode = audioManager.ringerMode
+
+                // Ignore the initial sticky broadcast when registering
+                if (lastRingerMode == null) {
+                    lastRingerMode = currentMode
+                    return
+                }
+
+                if (lastRingerMode == currentMode) return
+                lastRingerMode = currentMode
+
+                val (modeName, iconName) = when (currentMode) {
                     AudioManager.RINGER_MODE_SILENT -> "Silent" to "ic_volume_off"
                     AudioManager.RINGER_MODE_VIBRATE -> "Vibrate" to "ic_vibration"
                     AudioManager.RINGER_MODE_NORMAL -> "Ring" to "ic_volume_up"
@@ -163,31 +175,44 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
     
     override fun onCreate() {
         super.onCreate()
-        registerReceiver(ringerReceiver, IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION))
+
+        val exportFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Context.RECEIVER_NOT_EXPORTED
+        } else {
+            0
+        }
+
+        registerReceiver(ringerReceiver, IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION), exportFlag)
+
         val btFilter = IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
         }
-        registerReceiver(bluetoothReceiver, btFilter)
-        registerReceiver(vpnReceiver, IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION))
+        registerReceiver(bluetoothReceiver, btFilter, exportFlag)
 
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.addPrimaryClipChangedListener {
-            val clip = clipboard.primaryClip
-            if (clip != null && clip.itemCount > 0) {
-                val text = clip.getItemAt(0).coerceToText(this).toString().trim()
-                if (text.isNotBlank()) {
-                    LiveStatusReminder.showCustomCapsule(
-                        context = this,
-                        pillText = "copied",
-                        iconName = "ic_capsule_search",
-                        title = "clipboard",
-                        content = text.take(120),
-                        timeoutSeconds = 3,
-                        notificationId = 9010
-                    )
+        registerReceiver(vpnReceiver, IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION), exportFlag)
+
+        try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.addPrimaryClipChangedListener {
+                val clip = clipboard.primaryClip
+                if (clip != null && clip.itemCount > 0) {
+                    val text = clip.getItemAt(0).coerceToText(this).toString().trim()
+                    if (text.isNotBlank()) {
+                        LiveStatusReminder.showCustomCapsule(
+                            context = this,
+                            pillText = "copied",
+                            iconName = "ic_capsule_search",
+                            title = "clipboard",
+                            content = text.take(120),
+                            timeoutSeconds = 3,
+                            notificationId = 9010
+                        )
+                    }
                 }
             }
+        } catch (e: Exception) {
+            // Ignore background clipboard access restriction if app not in foreground
         }
 
 
