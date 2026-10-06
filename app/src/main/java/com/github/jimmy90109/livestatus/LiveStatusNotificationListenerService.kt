@@ -1,32 +1,35 @@
 package com.github.jimmy90109.livestatus
 
+import android.Manifest
 import android.app.Notification
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.media.AudioManager
+import android.media.session.MediaController
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.RemoteViews
 import android.widget.TextView
-import android.bluetooth.BluetoothDevice
-import android.content.BroadcastReceiver
-import android.content.ClipboardManager
-import android.content.Intent
-import android.content.IntentFilter
-import android.media.AudioManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import android.os.Build
-import java.util.Locale
-import android.Manifest
-import android.content.pm.PackageManager
-import android.util.Log
 import androidx.core.content.ContextCompat
 
 class LiveStatusNotificationListenerService : NotificationListenerService() {
@@ -68,6 +71,9 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
     private var lastMediaTrack: String? = null
     private var lastRingerMode: Int? = null
     private var wasVpnConnected = false
+    private val mediaSessionManager by lazy {
+        getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+    }
 
     private val ringerReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -94,10 +100,16 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                     context = context,
                     pillText = modeName,
                     iconName = iconName,
-                    title = "sound mode",
-                    content = "switched to $modeName",
+                    title = "Sound Mode",
+                    content = "Switched to $modeName",
                     timeoutSeconds = 3,
-                    notificationId = 9007
+                    notificationId = 9007,
+                    customContentIntent = android.app.PendingIntent.getActivity(
+                        context,
+                        9007,
+                        Intent(Settings.ACTION_SOUND_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                    )
                 )
             }
         }
@@ -129,27 +141,36 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 "Bluetooth Device"
             }
 
+            val btSettingsIntent = android.app.PendingIntent.getActivity(
+                context,
+                9008,
+                Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+
             when (intent.action) {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> {
                     LiveStatusReminder.showCustomCapsule(
                         context = context,
-                        pillText = deviceName.take(10),
+                        pillText = deviceName,
                         iconName = "ic_bluetooth",
-                        title = "connected",
+                        title = "Connected",
                         content = deviceName,
                         timeoutSeconds = 4,
-                        notificationId = 9008
+                        notificationId = 9008,
+                        customContentIntent = btSettingsIntent
                     )
                 }
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                     LiveStatusReminder.showCustomCapsule(
                         context = context,
-                        pillText = "offline",
+                        pillText = "Offline",
                         iconName = "ic_bluetooth",
-                        title = "disconnected",
+                        title = "Disconnected",
                         content = deviceName,
                         timeoutSeconds = 3,
-                        notificationId = 9008
+                        notificationId = 9008,
+                        customContentIntent = btSettingsIntent
                     )
                 }
             }
@@ -167,10 +188,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 wasVpnConnected = true
                 LiveStatusReminder.showCustomCapsule(
                     context = context,
-                    pillText = "vpn on",
+                    pillText = "VPN On",
                     iconName = "ic_vpn_key",
-                    title = "vpn connected",
-                    content = "secure network tunnel active",
+                    title = "VPN Connected",
+                    content = "Secure network tunnel active",
                     timeoutSeconds = 4,
                     notificationId = 9009
                 )
@@ -178,10 +199,10 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 wasVpnConnected = false
                 LiveStatusReminder.showCustomCapsule(
                     context = context,
-                    pillText = "vpn off",
+                    pillText = "VPN Off",
                     iconName = "ic_vpn_key",
-                    title = "vpn disconnected",
-                    content = "network tunnel closed",
+                    title = "VPN Disconnected",
+                    content = "Network tunnel closed",
                     timeoutSeconds = 3,
                     notificationId = 9009
                 )
@@ -231,14 +252,14 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                     val clip = clipboard.primaryClip
                     if (clip != null && clip.itemCount > 0) {
                         val text = clip.getItemAt(0)?.coerceToText(this)?.toString()?.trim() ?: ""
-                        if (text.isNotBlank()) {
+                        if (isContextuallyInspectable(text)) {
                             LiveStatusReminder.showCustomCapsule(
                                 context = this,
-                                pillText = "copied",
+                                pillText = "Inspect",
                                 iconName = "ic_capsule_search",
-                                title = "clipboard",
-                                content = text.take(120),
-                                timeoutSeconds = 3,
+                                title = "Clipboard Insight",
+                                content = text,
+                                timeoutSeconds = 4,
                                 notificationId = 9010
                             )
                         }
@@ -247,8 +268,39 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             }
         } catch (_: Exception) {}
 
-
         AppReminderPreferences.registerListener(this, citymapperPreferenceListener)
+    }
+
+    private fun isContextuallyInspectable(text: String): Boolean {
+        if (text.isBlank() || text.length > 300) return false
+        val mathPattern = Regex("""^[\d\s\+\-\*\/\^\(\)\.=\%]+$""")
+        val currencyPattern = Regex("""(?i)(?:[\$€£₹¥]|USD|INR|EUR|GBP)\s*[\d,]+(?:\.\d+)?|[\d,]+(?:\.\d+)?\s*(?:USD|INR|EUR|GBP)""")
+        val hexColorPattern = Regex("""^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$""")
+        val timezonePattern = Regex("""(?i)\b\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*(?:est|edt|pst|pdt|cst|cdt|gmt|utc|ist|jst)\b""")
+        return text.matches(hexColorPattern) ||
+               (text.length <= 40 && mathPattern.matches(text) && text.any { it.isDigit() } && text.any { "+-*/^%".contains(it) }) ||
+               currencyPattern.containsMatchIn(text) ||
+               timezonePattern.containsMatchIn(text)
+    }
+
+    private fun cleanSongTitle(rawTitle: String): String {
+        return rawTitle
+            .replace(Regex("""(?i)\s*[\(\[](?:feat\.?|ft\.?|with|remastered|bonus|deluxe|prod\.?|official).*?[\)\]]"""), "")
+            .trim()
+    }
+
+    private fun isMediaActivelyPlaying(packageName: String): Boolean {
+        return try {
+            val controllers = mediaSessionManager?.getActiveSessions(
+                ComponentName(this, LiveStatusNotificationListenerService::class.java)
+            ) ?: emptyList()
+            val match = controllers.firstOrNull { it.packageName == packageName } ?: controllers.firstOrNull()
+            match?.playbackState?.state == PlaybackState.STATE_PLAYING
+        } catch (_: SecurityException) {
+            true
+        } catch (_: Exception) {
+            true
+        }
     }
 
     override fun onNotificationPosted(statusBarNotification: StatusBarNotification?) {
@@ -280,7 +332,45 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             .joinToString(" ")
 
         try {
-            // 1. Progress Hook
+            // 1. Proton VPN Specific Extraction
+            if (packageName == "ch.protonvpn.android") {
+                val serverRegex = Regex("""[A-Z]{2}(?:-[A-Z]+)?#\d+""")
+                val matchedServer = serverRegex.find(fullText)?.value
+                if (matchedServer != null) {
+                    wasVpnConnected = true
+                    LiveStatusReminder.showCustomCapsule(
+                        context = this,
+                        pillText = matchedServer,
+                        iconName = "ic_vpn_key",
+                        title = "Proton VPN",
+                        content = "Connected: $matchedServer",
+                        timeoutSeconds = 4,
+                        notificationId = 9009,
+                        targetPackage = packageName
+                    )
+                    return
+                }
+            }
+
+            // 2. Ambient Music Mod (Now Playing) Hook
+            if (packageName == "com.kieronquinn.app.ambientmusicmod") {
+                if (title.isNotBlank()) {
+                    val cleanTrack = cleanSongTitle(title)
+                    LiveStatusReminder.showCustomCapsule(
+                        context = this,
+                        pillText = cleanTrack,
+                        iconName = "ic_music_notification",
+                        title = cleanTrack,
+                        content = if (contentText.isNotBlank()) "by $contentText" else "Now Playing",
+                        timeoutSeconds = 6,
+                        notificationId = 9011,
+                        targetPackage = packageName
+                    )
+                    return
+                }
+            }
+
+            // 3. Download & Tasks Progress Hook
             val maxProgress = notification.extras?.getInt(Notification.EXTRA_PROGRESS_MAX, 0) ?: 0
             val currentProgress = notification.extras?.getInt(Notification.EXTRA_PROGRESS, 0) ?: 0
             val isIndeterminate = notification.extras?.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false) ?: false
@@ -309,31 +399,44 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                     title = "$appLabel ($percent%)",
                     content = fileDetail,
                     timeoutSeconds = 0,
-                    notificationId = 9005
+                    notificationId = 9005,
+                    targetPackage = packageName
                 )
                 return
             }
 
-            // 2. Track Change Hook
+            // 4. Track Change & Spotify Ad Hook
             val isMedia = notification.category == Notification.CATEGORY_TRANSPORT ||
                           notification.extras?.containsKey(Notification.EXTRA_MEDIA_SESSION) == true
             if (isMedia && title.isNotBlank()) {
                 val trackIdentifier = "$title - $contentText"
-                if (trackIdentifier != lastMediaTrack) {
+                if (trackIdentifier != lastMediaTrack && isMediaActivelyPlaying(packageName)) {
                     lastMediaTrack = trackIdentifier
+
+                    val isSpotifyAd = packageName == "com.spotify.music" && (
+                        title.equals("Advertisement", ignoreCase = true) ||
+                        title.equals("Spotify", ignoreCase = true) ||
+                        contentText.contains("Advertisement", ignoreCase = true) ||
+                        contentText.equals("Ad", ignoreCase = true)
+                    )
+
+                    val cleanTitle = cleanSongTitle(title)
+                    val pillDisplay = if (isSpotifyAd) "Ad" else cleanTitle
+
                     LiveStatusReminder.showCustomCapsule(
                         context = this,
-                        pillText = title.take(12).lowercase(Locale.ROOT),
+                        pillText = pillDisplay,
                         iconName = "ic_music_notification",
-                        title = title.lowercase(Locale.ROOT),
-                        content = if (contentText.isNotBlank()) contentText else "now playing",
+                        title = if (isSpotifyAd) "Spotify" else title,
+                        content = if (isSpotifyAd) "Advertisement" else (if (contentText.isNotBlank()) contentText else "Now playing"),
                         timeoutSeconds = 5,
-                        notificationId = 9006
+                        notificationId = 9006,
+                        targetPackage = packageName
                     )
                 }
             }
 
-            // 3. Calendar Interceptor
+            // 5. Calendar Interceptor
             if (packageName == "com.google.android.calendar" || packageName == "com.oplus.calendar") {
                 val timeRegex = Regex("(\\d{1,2}):(\\d{2})")
                 val match = timeRegex.find(fullText)
@@ -344,7 +447,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
 
                     CalendarCountdownManager.startCountdown(
                         context = this,
-                        eventTitle = if (title.isNotBlank()) title else "calendar event",
+                        eventTitle = if (title.isNotBlank()) title else "Calendar Event",
                         targetHour = hour,
                         targetMinute = minute
                     )
@@ -352,7 +455,7 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 }
             }
 
-            // 4. Custom Rules Engine
+            // 6. Custom Rules Engine
             val titleMatch = if (title.isNotBlank()) {
                 CustomRuleEngine.evaluate(packageName, title)
             } else null
@@ -364,10 +467,11 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                     context = this,
                     pillText = customMatch.pillText,
                     iconName = customMatch.iconName,
-                    title = if (title.isNotBlank()) title else "live update",
+                    title = if (title.isNotBlank()) title else "Live Update",
                     content = if (contentText.isNotBlank()) contentText else fullText,
                     timeoutSeconds = customMatch.timeoutSeconds,
-                    notificationId = 9004
+                    notificationId = 9004,
+                    targetPackage = packageName
                 )
                 return
             }
@@ -716,7 +820,6 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                 val contentText = readNotificationContentText(notification)
                 val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
 
-                // Extract messages specifically for WhatsApp / MessagingStyle apps
                 val messagingStyleText = if (statusBarNotification.packageName == "com.whatsapp") {
                     val messages = notification.extras.getParcelableArray(Notification.EXTRA_MESSAGES)
                     messages?.mapNotNull { msg ->
@@ -724,8 +827,9 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
                     }?.joinToString(" ")
                 } else null
 
-// Combine all possible body extras so bank/carrier texts don't get truncated
-                val combinedBody = listOfNotNull(contentText, bigText, notificationText).distinct().joinToString(" ")
+                val combinedBody = listOfNotNull(contentText, bigText, notificationText, messagingStyleText)
+                    .distinct()
+                    .joinToString(" ")
 
                 val otp = LiveStatusNotificationParser.parseOtp(title, combinedBody)
                 if (otp?.code != null) {
@@ -1520,4 +1624,3 @@ class LiveStatusNotificationListenerService : NotificationListenerService() {
             toString().replace(Regex("""\s+"""), " ").trim().takeIf { it.isNotEmpty() }
     }
 }
-
