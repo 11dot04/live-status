@@ -906,6 +906,13 @@ object LiveStatusReminder {
         notificationManager.notify(notificationId, builder.build())
     }
 
+    data class InspectDetailPayload(
+        val title: String,
+        val subtitle: String = "",
+        val fullContent: String,
+        val copyText: String = fullContent
+    )
+
     @JvmStatic
     fun showCustomCapsule(
         context: Context,
@@ -917,7 +924,10 @@ object LiveStatusReminder {
         customIcon: Icon? = null,
         actions: List<Notification.Action> = emptyList(),
         notificationId: Int = 9003,
-        chronometerTargetMillis: Long? = null
+        chronometerTargetMillis: Long? = null,
+        targetPackage: String? = null,
+        customContentIntent: PendingIntent? = null,
+        detailPayload: InspectDetailPayload? = null
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return
@@ -930,6 +940,19 @@ object LiveStatusReminder {
             Icon.createWithResource(context, R.drawable.ic_notification)
         }
 
+        // Tap redirection: either explicit PendingIntent or resolve launch intent of targetPackage
+        val launchIntent: PendingIntent? = customContentIntent ?: targetPackage?.let { pkg ->
+            context.packageManager.getLaunchIntentForPackage(pkg)?.let { intent ->
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                PendingIntent.getActivity(
+                    context,
+                    notificationId,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+        }
+
         val builder = Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(icon)
             .setContentTitle(title)
@@ -940,27 +963,56 @@ object LiveStatusReminder {
             .setOnlyAlertOnce(true)
             .setAutoCancel(true)
 
+        launchIntent?.let { builder.setContentIntent(it) }
+
         if (chronometerTargetMillis != null) {
             builder.setWhen(chronometerTargetMillis)
                 .setShowWhen(true)
                 .setUsesChronometer(true)
                 .setChronometerCountDown(true)
+            // ColorOS SystemUI natively ticks the pill when shortCriticalText is null/omitted
+        } else {
+            builder.setShortCriticalText(pillText)
         }
 
         if (timeoutSeconds > 0) {
             builder.setTimeoutAfter(timeoutSeconds * 1000L)
         }
 
-        actions.forEach { builder.addAction(it) }
+        val mutableActions = actions.toMutableList()
 
-        builder.setShortCriticalText(pillText)
+        // Attach Inspect Detail Sheet action if multi-line overflow context is provided
+        if (detailPayload != null) {
+            val detailIntent = Intent(context, InspectDetailActivity::class.java).apply {
+                putExtra("EXTRA_NOTIFICATION_ID", notificationId)
+                putExtra("EXTRA_TITLE", detailPayload.title)
+                putExtra("EXTRA_SUBTITLE", detailPayload.subtitle)
+                putExtra("EXTRA_FULL_CONTENT", detailPayload.fullContent)
+                putExtra("EXTRA_COPY_PAYLOAD", detailPayload.copyText)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            val detailPendingIntent = PendingIntent.getActivity(
+                context,
+                notificationId + 1000,
+                detailIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val inspectAction = Notification.Action.Builder(
+                Icon.createWithResource(context, R.drawable.ic_notification),
+                "Details",
+                detailPendingIntent
+            ).build()
+            mutableActions.add(inspectAction)
+        }
+
+        mutableActions.forEach { builder.addAction(it) }
+
         builder.extras.putBoolean("android.ongoingActivity", true)
         builder.extras.putString("oplus.liveNotificationType", "capsule")
         requestPromotedOngoing(builder)
 
         notificationManager.notify(notificationId, builder.build())
     }
-
 
     internal fun showDiscordVoice(context: Context, update: DiscordVoiceUpdate) {
         
