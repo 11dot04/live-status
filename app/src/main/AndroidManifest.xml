@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     
     <queries>
         <package android:name="com.citymapper.app.release" />
@@ -25,6 +26,8 @@
         <package android:name="com.discord" />
         <package android:name="com.microsoft.teams" />
         <package android:name="com.google.android.apps.recorder" />
+        <package android:name="ch.protonvpn.android" />
+        <package android:name="com.kieronquinn.app.ambientmusicmod" />
     </queries>
 
     <application
@@ -49,12 +52,18 @@
             android:name=".ProcessTextActivity"
             android:label="Inspect"
             android:exported="true">
-            <intent-filter>
+            <intent-filter android:priority="100">
                 <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".InspectDetailActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.LiveStatusReminder.Dialog" />
 
         <activity
             android:name=".ui.home.YouBikeRegionPickerActivity"
