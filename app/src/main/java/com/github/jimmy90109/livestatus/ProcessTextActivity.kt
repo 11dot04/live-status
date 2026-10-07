@@ -10,7 +10,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.drawable.Icon
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -35,7 +34,6 @@ class ProcessTextActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val rawText = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.trim()
-
         if (rawText.isNullOrBlank()) {
             finish()
             return
@@ -77,12 +75,7 @@ class ProcessTextActivity : Activity() {
             return
         }
 
-        // 5. Date / Relative Day Inspector
-        if (handleDateLookup(rawText)) {
-            return
-        }
-
-        // 6. Currency Converter ($50, 50 USD, €20, etc.)
+        // 5. Currency Converter ($50, 50 USD, €20, etc.)
         val currencyRegex = Regex("(?i)^([$€£¥₹])?\\s*(\\d+(?:\\.\\d+)?)\\s*([a-z]{3})?$")
         val currMatch = currencyRegex.find(rawText)
         if (currMatch != null) {
@@ -95,42 +88,41 @@ class ProcessTextActivity : Activity() {
             }
         }
 
-        // 7. Scientific Physical Constants
+        // 6. Scientific Physical Constants
         if (handleScientificConstant(rawText)) {
             return
         }
 
-        // 8. Unit Conversions: Local fast-path with API fallback
-        val unitMatch = Regex("""(?i)^\s*(\d+(?:\.\d+)?)\s*([a-zA-Z°/³²]{1,12})\s*$""").find(rawText)
-        if (unitMatch != null) {
-            val valNum = unitMatch.groupValues[1].toDoubleOrNull()
-            val unitStr = unitMatch.groupValues[2].lowercase(Locale.ROOT)
-            if (valNum != null) {
-                if (handleLocalUnitConversion(valNum, unitStr, rawText)) {
-                    return
-                } else {
-                    // Fallback to DuckDuckGo conversion API in a background thread
-                    thread {
-                        if (!handleApiUnitConversion(rawText, valNum, unitStr)) {
-                            dispatchScholarlyOrLexicon(rawText)
-                        }
-                    }
-                    return
-                }
-            }
+        // 7. Deterministic Stoichiometry & Chemical Formula Breakdown (e.g. C6H12O6, H2SO4)
+        if (handleStoichiometryFormula(rawText)) {
+            return
         }
 
-        // 9. URLs, Scientific Lookups, or Lexicon
+        // 8. Pharmacology & Clinical Drug Monograph
+        if (handlePharmacologyMonograph(rawText)) {
+            return
+        }
+
+        // 9. Imperial / Metric Dynamic Unit Normalizer
+        if (handleUnitConversion(rawText)) {
+            return
+        }
+
+        // 10. Date / Relative Day Inspector
+        if (handleDateLookup(rawText)) {
+            return
+        }
+
+        // 11. URLs, Taxonomy (GBIF), or Multi-Part Lexicon
         thread {
-            dispatchScholarlyOrLexicon(rawText)
+            dispatchNetworkInspections(rawText)
         }
     }
 
-    private fun dispatchScholarlyOrLexicon(rawText: String) {
+    private fun dispatchNetworkInspections(rawText: String) {
         when {
             isUrl(rawText) -> handleUrlInspection(rawText)
             looksLikeBinomialTaxon(rawText) && handleGbifLookup(rawText) -> {}
-            looksLikeChemicalOrDrug(rawText) && handlePubChemLookup(rawText) -> {}
             else -> handleDictionaryLookup(rawText)
         }
     }
@@ -139,13 +131,6 @@ class ProcessTextActivity : Activity() {
         return input.startsWith("http://", ignoreCase = true) ||
                 input.startsWith("https://", ignoreCase = true) ||
                 (input.contains(".") && !input.contains(" ") && input.length >= 4)
-    }
-
-    private fun looksLikeChemicalOrDrug(input: String): Boolean {
-        val hasFormulaPattern = Regex("""^[A-Z][a-z]?\d*([A-Z][a-z]?\d*)+$""").matches(input)
-        val hasDrugSuffix = listOf("olol", "cillin", "mab", "pril", "statin", "prazole", "sartan", "tidine", "ine", "ol")
-            .any { input.lowercase(Locale.ROOT).endsWith(it) }
-        return hasFormulaPattern || hasDrugSuffix
     }
 
     private fun looksLikeBinomialTaxon(input: String): Boolean {
@@ -200,9 +185,9 @@ class ProcessTextActivity : Activity() {
             notificationId = INSPECT_NOTIFICATION_ID,
             detailPayload = LiveStatusReminder.InspectDetailPayload(
                 domain = "LXCN",
-                title = "READING METRICS",
-                subtitle = "$wordCount words ($charCount characters)",
-                fullContent = "Estimated reading time: $timeFormatted (at 230 wpm).\n\nText sample:\n${rawText.take(400)}...",
+                title = "Reading Estimate",
+                subtitle = "$wordCount words • $charCount characters",
+                fullContent = "Calculated at an average reading pace of 230 words per minute.\n\nSample:\n${rawText.take(350)}...",
                 copyText = rawText
             )
         )
@@ -235,7 +220,7 @@ class ProcessTextActivity : Activity() {
                     domain = "CHMSTRY",
                     title = "#${fullHex.uppercase(Locale.ROOT)}",
                     subtitle = "RGB ($r, $g, $b)",
-                    fullContent = "HEX: #${fullHex.uppercase(Locale.ROOT)}\nRGB: rgb($r, $g, $b)\nAlpha: 255",
+                    fullContent = "Hexadecimal: #${fullHex.uppercase(Locale.ROOT)}\nRed: $r\nGreen: $g\nBlue: $b",
                     copyText = "#${fullHex.uppercase(Locale.ROOT)}"
                 )
             )
@@ -293,63 +278,69 @@ class ProcessTextActivity : Activity() {
             detailPayload = LiveStatusReminder.InspectDetailPayload(
                 domain = "LXCN",
                 title = localConverted,
-                subtitle = "Source: $original ($tzStr)",
-                fullContent = "Local: $localConverted\nOriginal: $original\nZone: $tzId",
+                subtitle = "Converted from $original ($tzStr)",
+                fullContent = "Local converted time is $localConverted.\nOriginal source time: $original\nResolved Time Zone: $tzId",
                 copyText = localConverted
             )
         )
         finish()
     }
 
-    private fun handleLocalUnitConversion(value: Double, unit: String, rawText: String): Boolean {
-        val (convertedPill, convertedExpanded) = when {
-            unit == "f" || unit.startsWith("fahrenheit") -> {
-                val c = (value - 32.0) * 5.0 / 9.0
-                String.format(Locale.ROOT, "%.1f°C", c) to "$value°F = ${String.format(Locale.ROOT, "%.1f", c)}°C"
-            }
-            unit == "c" || unit.startsWith("celsius") -> {
-                val f = (value * 9.0 / 5.0) + 32.0
-                String.format(Locale.ROOT, "%.1f°F", f) to "$value°C = ${String.format(Locale.ROOT, "%.1f", f)}°F"
-            }
-            unit == "lb" || unit == "lbs" || unit.startsWith("pound") -> {
+    private fun handleUnitConversion(rawText: String): Boolean {
+        val unitRegex = Regex("""(?i)^\s*(\d+(?:\.\d+)?)\s*(lbs?|pounds?|st|stone|oz|ounces?|ft|feet|in|inch(?:es)?|mi|miles?|mph|kmh|km/h|knots?|psi|bar|f|c|fahrenheit|celsius)\s*$""")
+        val m = unitRegex.find(rawText.trim()) ?: return false
+
+        val value = m.groupValues[1].toDoubleOrNull() ?: return false
+        val unit = m.groupValues[2].lowercase(Locale.ROOT)
+
+        val (convertedPill, targetName, convertedExpanded) = when {
+            unit.startsWith("lb") || unit.startsWith("pound") -> {
                 val kg = value * 0.45359237
-                String.format(Locale.ROOT, "%.1f kg", kg) to "$value lbs = ${String.format(Locale.ROOT, "%.2f", kg)} kg"
+                Triple(String.format(Locale.ROOT, "%.1f kg", kg), "Kilograms", "$value lbs converts to ${String.format(Locale.ROOT, "%.2f", kg)} kg")
             }
-            unit == "stone" || unit == "st" -> {
+            unit == "st" || unit == "stone" -> {
                 val kg = value * 6.35029
-                String.format(Locale.ROOT, "%.1f kg", kg) to "$value stone = ${String.format(Locale.ROOT, "%.2f", kg)} kg"
+                Triple(String.format(Locale.ROOT, "%.1f kg", kg), "Kilograms", "$value stone converts to ${String.format(Locale.ROOT, "%.2f", kg)} kg")
             }
-            unit == "oz" || unit.startsWith("ounce") -> {
+            unit.startsWith("oz") || unit.startsWith("ounce") -> {
                 val g = value * 28.3495
-                String.format(Locale.ROOT, "%.0f g", g) to "$value oz = ${String.format(Locale.ROOT, "%.1f", g)} g"
+                Triple(String.format(Locale.ROOT, "%.0f g", g), "Grams", "$value oz converts to ${String.format(Locale.ROOT, "%.1f", g)} grams")
             }
             unit == "ft" || unit.startsWith("feet") -> {
                 val cm = value * 30.48
-                String.format(Locale.ROOT, "%.0f cm", cm) to "$value ft = ${String.format(Locale.ROOT, "%.1f", cm)} cm"
+                Triple(String.format(Locale.ROOT, "%.0f cm", cm), "Centimeters", "$value ft converts to ${String.format(Locale.ROOT, "%.1f", cm)} cm")
             }
             unit.startsWith("in") -> {
                 val cm = value * 2.54
-                String.format(Locale.ROOT, "%.1f cm", cm) to "$value in = ${String.format(Locale.ROOT, "%.2f", cm)} cm"
+                Triple(String.format(Locale.ROOT, "%.1f cm", cm), "Centimeters", "$value in converts to ${String.format(Locale.ROOT, "%.2f", cm)} cm")
             }
             unit == "mi" || unit.startsWith("mile") -> {
                 val km = value * 1.60934
-                String.format(Locale.ROOT, "%.1f km", km) to "$value mi = ${String.format(Locale.ROOT, "%.2f", km)} km"
+                Triple(String.format(Locale.ROOT, "%.1f km", km), "Kilometers", "$value mi converts to ${String.format(Locale.ROOT, "%.2f", km)} km")
             }
             unit == "mph" -> {
                 val kmh = value * 1.60934
-                String.format(Locale.ROOT, "%.0f km/h", kmh) to "$value mph = ${String.format(Locale.ROOT, "%.1f", kmh)} km/h"
+                Triple(String.format(Locale.ROOT, "%.0f km/h", kmh), "Kilometers per Hour", "$value mph converts to ${String.format(Locale.ROOT, "%.1f", kmh)} km/h")
             }
-            unit == "knot" || unit == "knots" -> {
+            unit.startsWith("knot") -> {
                 val kmh = value * 1.852
-                String.format(Locale.ROOT, "%.0f km/h", kmh) to "$value knots = ${String.format(Locale.ROOT, "%.1f", kmh)} km/h"
+                Triple(String.format(Locale.ROOT, "%.0f km/h", kmh), "Kilometers per Hour", "$value knots converts to ${String.format(Locale.ROOT, "%.1f", kmh)} km/h")
             }
             unit == "psi" -> {
                 val bar = value * 0.0689476
-                String.format(Locale.ROOT, "%.2f bar", bar) to "$value psi = ${String.format(Locale.ROOT, "%.3f", bar)} bar"
+                Triple(String.format(Locale.ROOT, "%.2f bar", bar), "Bar Pressure", "$value psi converts to ${String.format(Locale.ROOT, "%.3f", bar)} bar (${String.format(Locale.ROOT, "%.1f", value * 6.89476)} kPa)")
             }
             unit == "bar" -> {
                 val psi = value * 14.5038
-                String.format(Locale.ROOT, "%.1f psi", psi) to "$value bar = ${String.format(Locale.ROOT, "%.2f", psi)} psi"
+                Triple(String.format(Locale.ROOT, "%.1f psi", psi), "Pounds per Square Inch", "$value bar converts to ${String.format(Locale.ROOT, "%.2f", psi)} psi")
+            }
+            unit == "f" || unit.startsWith("fahrenheit") -> {
+                val c = (value - 32.0) * 5.0 / 9.0
+                Triple(String.format(Locale.ROOT, "%.1f°C", c), "Celsius", "$value°F converts to ${String.format(Locale.ROOT, "%.1f", c)}°C")
+            }
+            unit == "c" || unit.startsWith("celsius") -> {
+                val f = (value * 9.0 / 5.0) + 32.0
+                Triple(String.format(Locale.ROOT, "%.1f°F", f), "Fahrenheit", "$value°C converts to ${String.format(Locale.ROOT, "%.1f", f)}°F")
             }
             else -> return false
         }
@@ -366,7 +357,7 @@ class ProcessTextActivity : Activity() {
             detailPayload = LiveStatusReminder.InspectDetailPayload(
                 domain = "CHMSTRY",
                 title = convertedPill,
-                subtitle = rawText,
+                subtitle = targetName,
                 fullContent = convertedExpanded,
                 copyText = convertedPill
             )
@@ -375,38 +366,269 @@ class ProcessTextActivity : Activity() {
         return true
     }
 
-    private fun handleApiUnitConversion(rawText: String, value: Double, unit: String): Boolean {
+    private fun handleScientificConstant(rawText: String): Boolean {
+        val key = rawText.lowercase(Locale.ROOT).trim()
+        val constants = mapOf(
+            "c" to Triple("Speed of Light", "2.998 × 10⁸ m/s", "Speed of electromagnetic radiation in a vacuum."),
+            "h" to Triple("Planck Constant", "6.626 × 10⁻³⁴ J·s", "Fundamental quantum constant relating photon energy to frequency."),
+            "hbar" to Triple("Reduced Planck", "1.055 × 10⁻³⁴ J·s", "Dirac constant ħ = h / 2π used in quantum mechanics."),
+            "k_b" to Triple("Boltzmann Constant", "1.381 × 10⁻²³ J/K", "Relates thermal energy to thermodynamic temperature."),
+            "kb" to Triple("Boltzmann Constant", "1.381 × 10⁻²³ J/K", "Relates thermal energy to thermodynamic temperature."),
+            "n_a" to Triple("Avogadro Constant", "6.022 × 10²³ mol⁻¹", "Number of constituent particles per mole of substance."),
+            "na" to Triple("Avogadro Constant", "6.022 × 10²³ mol⁻¹", "Number of constituent particles per mole of substance."),
+            "g" to Triple("Gravitational Constant", "6.674 × 10⁻¹¹ N·m²/kg²", "Newtonian constant of universal gravitation."),
+            "eps_0" to Triple("Vacuum Permittivity", "8.854 × 10⁻¹² F/m", "Permittivity of free space to electric flux.")
+        )
+
+        val found = constants[key] ?: return false
+        LiveStatusReminder.showCustomCapsule(
+            context = applicationContext,
+            pillText = found.second.split(" ").take(3).joinToString(" "),
+            iconName = "ic_functions",
+            title = found.first,
+            content = "${found.second} • ${found.third}",
+            timeoutSeconds = 15,
+            actions = listOf(getDismissAction()),
+            notificationId = INSPECT_NOTIFICATION_ID,
+            detailPayload = LiveStatusReminder.InspectDetailPayload(
+                domain = "CHMSTRY",
+                title = found.second,
+                subtitle = found.first,
+                fullContent = "${found.first}\n\n${found.third}",
+                copyText = found.second
+            )
+        )
+        finish()
+        return true
+    }
+
+    private fun handleStoichiometryFormula(rawText: String): Boolean {
+        val cleaned = rawText.trim()
+        val formulaRegex = Regex("""^([A-Z][a-z]?\d*)+$""")
+        if (!formulaRegex.matches(cleaned) || cleaned.length < 2 || cleaned.length > 25) return false
+
+        val masses = mapOf(
+            "H" to 1.008, "He" to 4.003, "Li" to 6.94, "Be" to 9.012, "B" to 10.81,
+            "C" to 12.011, "N" to 14.007, "O" to 15.999, "F" to 18.998, "Ne" to 20.18,
+            "Na" to 22.990, "Mg" to 24.305, "Al" to 26.982, "Si" to 28.085, "P" to 30.974,
+            "S" to 32.06, "Cl" to 35.45, "K" to 39.098, "Ca" to 40.078, "Fe" to 55.845,
+            "Cu" to 63.546, "Zn" to 65.38, "Br" to 79.904, "Ag" to 107.868, "I" to 126.904,
+            "Ba" to 137.327, "Au" to 196.967, "Pb" to 207.2
+        )
+
+        val elemRegex = Regex("""([A-Z][a-z]?)(\d*)""")
+        val matches = elemRegex.findAll(cleaned).toList()
+        if (matches.isEmpty()) return false
+
+        var totalMass = 0.0
+        val elemWeights = mutableListOf<Pair<String, Double>>()
+
+        for (m in matches) {
+            val elem = m.groupValues[1]
+            val count = m.groupValues[2].toIntOrNull() ?: 1
+            val atomicMass = masses[elem] ?: return false
+            val contribution = atomicMass * count
+            totalMass += contribution
+            elemWeights.add(Pair(elem, contribution))
+        }
+
+        val massStr = String.format(Locale.ROOT, "%.2f g/mol", totalMass)
+
+        // Generate Monospace Stoichiometry Bar
+        val barTotalSegments = 24
+        val barBuilder = StringBuilder("[")
+        val pctStrings = mutableListOf<String>()
+
+        elemWeights.forEach { (elem, weight) ->
+            val pct = (weight / totalMass) * 100.0
+            pctStrings.add(String.format(Locale.ROOT, "%s %.1f%%", elem, pct))
+            val segments = Math.round((weight / totalMass) * barTotalSegments).toInt()
+            repeat(segments.coerceAtLeast(1)) { barBuilder.append("█") }
+        }
+        val currentLen = barBuilder.length - 1
+        if (currentLen < barTotalSegments) {
+            repeat(barTotalSegments - currentLen) { barBuilder.append("░") }
+        } else if (currentLen > barTotalSegments) {
+            barBuilder.setLength(barTotalSegments + 1)
+        }
+        barBuilder.append("]")
+
+        val bodyText = "${barBuilder}\n${pctStrings.joinToString("   ")}\n\nMolar mass calculation determined from standard IUPAC elemental atomic weights."
+
+        LiveStatusReminder.showCustomCapsule(
+            context = applicationContext,
+            pillText = massStr,
+            iconName = "ic_science",
+            title = cleaned,
+            content = massStr,
+            timeoutSeconds = 15,
+            actions = listOf(getDismissAction()),
+            notificationId = INSPECT_NOTIFICATION_ID,
+            detailPayload = LiveStatusReminder.InspectDetailPayload(
+                domain = "CHMSTRY",
+                title = cleaned,
+                subtitle = massStr,
+                fullContent = bodyText,
+                copyText = "$cleaned: $massStr"
+            )
+        )
+        finish()
+        return true
+    }
+
+    private fun handlePharmacologyMonograph(rawText: String): Boolean {
+        val word = rawText.lowercase(Locale.ROOT).trim()
+
+        val drugs = mapOf(
+            "metoprolol" to Triple(
+                "Beta-1 Adrenergic Blocker",
+                "Competitive cardioselective beta-1 receptor antagonist. Reduces cardiac output, heart rate, and systemic blood pressure.",
+                "[ USAN: -olol ] • [ 200mg MAX/DIE ]"
+            ),
+            "atorvastatin" to Triple(
+                "HMG-CoA Reductase Inhibitor",
+                "Competitively inhibits 3-hydroxy-3-methylglutaryl-coenzyme A reductase, suppressing hepatic cholesterol biosynthesis and upregulating LDL receptors.",
+                "[ USAN: -statin ] • [ 80mg MAX/DIE ]"
+            ),
+            "amoxicillin" to Triple(
+                "Aminopenicillin Antibiotic",
+                "Bactericidal beta-lactam that inhibits transpeptidase-mediated bacterial cell wall synthesis during active peptidoglycan replication.",
+                "[ USAN: -cillin ] • [ 500mg - 875mg Q12H ]"
+            ),
+            "paracetamol" to Triple(
+                "Analgesic & Antipyretic",
+                "Centrally acting cyclooxygenase (COX-3/peroxidase) inhibitor. Crosses blood-brain barrier to alleviate pain and reset hypothalamic thermoregulatory center.",
+                "[ INN: Paracetamol / APAP ] • [ 4000mg MAX/DIE ]"
+            ),
+            "omeprazole" to Triple(
+                "Proton Pump Inhibitor",
+                "Irreversibly inhibits the gastric H+/K+-ATPase pump in gastric parietal cells, causing profound and prolonged suppression of gastric acid production.",
+                "[ USAN: -prazole ] • [ 40mg MAX/DIE ]"
+            ),
+            "losartan" to Triple(
+                "Angiotensin II Receptor Antagonist",
+                "Selectively blocks the AT1 receptor subtype, preventing angiotensin II vasoconstriction and aldosterone secretion.",
+                "[ USAN: -sartan ] • [ 100mg MAX/DIE ]"
+            )
+        )
+
+        val entry = drugs[word] ?: run {
+            // Suffix pattern recognition fallback
+            when {
+                word.endsWith("olol") -> Triple("Beta-Adrenergic Blocker", "Antihypertensive and antiarrhythmic agent acting on beta receptors.", "[ USAN: -olol ]")
+                word.endsWith("statin") -> Triple("HMG-CoA Reductase Inhibitor", "Lipid-lowering agent reducing endogenous cholesterol synthesis.", "[ USAN: -statin ]")
+                word.endsWith("cillin") -> Triple("Beta-Lactam Antibiotic", "Bactericidal antibiotic inhibiting cell wall synthesis.", "[ USAN: -cillin ]")
+                word.endsWith("pril") -> Triple("ACE Inhibitor", "Inhibits angiotensin-converting enzyme to promote vasodilation.", "[ USAN: -pril ]")
+                word.endsWith("sartan") -> Triple("Angiotensin Receptor Blocker", "Blocks AT1 receptors to lower peripheral resistance.", "[ USAN: -sartan ]")
+                word.endsWith("prazole") -> Triple("Proton Pump Inhibitor", "Inhibits gastric parietal H+/K+ ATPase to block acid production.", "[ USAN: -prazole ]")
+                else -> null
+            }
+        } ?: return false
+
+        val titleDisplay = word.replaceFirstChar { it.uppercase(Locale.ROOT) }
+        val bodyContent = "${entry.second}\n\n${entry.third}"
+
+        LiveStatusReminder.showCustomCapsule(
+            context = applicationContext,
+            pillText = entry.first.split(" ").first(),
+            iconName = "ic_medication",
+            title = titleDisplay,
+            content = entry.first,
+            timeoutSeconds = 15,
+            actions = listOf(getDismissAction()),
+            notificationId = INSPECT_NOTIFICATION_ID,
+            detailPayload = LiveStatusReminder.InspectDetailPayload(
+                domain = "PHRM",
+                title = titleDisplay,
+                subtitle = entry.first,
+                fullContent = bodyContent,
+                copyText = "$titleDisplay: ${entry.first}\n\n${entry.second}"
+            )
+        )
+        finish()
+        return true
+    }
+
+    private fun handleGbifLookup(term: String): Boolean {
+        val cleaned = term.trim()
+
+        val offlineTaxa = mapOf(
+            "mangifera indica" to Triple("Mango", "Anacardiaceae", "Flowering dicot tree indigenous to tropical Asia. Produces commercially significant drupe fruits with fibrous mesocarp."),
+            "panthera tigris" to Triple("Tiger", "Felidae", "Apex apex obligate carnivore. Recognized by dark vertical stripes across reddish-orange pelt."),
+            "ficus religiosa" to Triple("Sacred Fig", "Moraceae", "Deciduous hemiepiphytic fig native to the Indian subcontinent with characteristic cordate leaves."),
+            "arabidopsis thaliana" to Triple("Thale Cress", "Brassicaceae", "Small flowering plant widely deployed as an essential model organism in plant genetics and genomics."),
+            "homo sapiens" to Triple("Human", "Hominidae", "Bipedal hominid primate species characterized by advanced cognitive faculties and encephalization."),
+            "pisum sativum" to Triple("Garden Pea", "Fabaceae", "Annual legume widely cultivated for nutritious seed pods; foundation of classical Mendelian genetics.")
+        )
+
+        val local = offlineTaxa[cleaned.lowercase(Locale.ROOT)]
+        if (local != null) {
+            val common = local.first
+            val family = local.second
+            val notes = local.third
+            val body = "Taxon Family: $family\nClassification: Plantae / Animalia\n\n$notes"
+
+            mainHandler.post {
+                LiveStatusReminder.showCustomCapsule(
+                    context = applicationContext,
+                    pillText = common,
+                    iconName = "ic_eco",
+                    title = cleaned,
+                    content = "$family • $common",
+                    timeoutSeconds = 16,
+                    actions = listOf(getDismissAction()),
+                    notificationId = INSPECT_NOTIFICATION_ID,
+                    detailPayload = LiveStatusReminder.InspectDetailPayload(
+                        domain = "TXNMY",
+                        title = cleaned,
+                        subtitle = "$family • $common",
+                        fullContent = body,
+                        copyText = "$cleaned ($common, $family)"
+                    )
+                )
+                finish()
+            }
+            return true
+        }
+
+        // Live GBIF Endpoint
         return try {
-            val query = URLEncoder.encode("$rawText in metric", "UTF-8")
-            val url = URL("https://api.duckduckgo.com/?q=$query&format=json&no_html=1")
+            val encoded = URLEncoder.encode(cleaned, "UTF-8")
+            val url = URL("https://api.gbif.org/v1/species/match?name=$encoded")
             val conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 3000
-                readTimeout = 3000
+                connectTimeout = 3500
+                readTimeout = 3500
+                setRequestProperty("User-Agent", "LiveStatus-Android/1.0")
             }
             if (conn.responseCode != 200) return false
 
             val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-            var answer = json.optString("Answer", "")
-            if (answer.isBlank()) answer = json.optString("AbstractText", "")
-            if (answer.isBlank()) return false
+            val canonical = json.optString("canonicalName", "")
+            if (canonical.isBlank()) return false
 
-            val cleanAnswer = answer.replace(Regex("""<[^>]*>"""), "").trim()
+            val kingdom = json.optString("kingdom", "Taxon")
+            val family = json.optString("family", "")
+            val status = json.optString("status", "ACCEPTED")
+
+            val sub = if (family.isNotBlank()) "$family • $kingdom" else kingdom
+            val body = "Taxon Status: $status\nFamily: $family\nKingdom: $kingdom\n\nIdentified via Global Biodiversity Information Facility taxonomy index."
+
             mainHandler.post {
                 LiveStatusReminder.showCustomCapsule(
                     context = applicationContext,
-                    pillText = cleanAnswer.take(16),
-                    iconName = "ic_capsule_search",
-                    title = "Unit Conversion",
-                    content = cleanAnswer,
-                    timeoutSeconds = 14,
+                    pillText = canonical,
+                    iconName = "ic_eco",
+                    title = canonical,
+                    content = sub,
+                    timeoutSeconds = 16,
                     actions = listOf(getDismissAction()),
                     notificationId = INSPECT_NOTIFICATION_ID,
                     detailPayload = LiveStatusReminder.InspectDetailPayload(
-                        domain = "CHMSTRY",
-                        title = cleanAnswer,
-                        subtitle = rawText,
-                        fullContent = "$rawText = $cleanAnswer",
-                        copyText = cleanAnswer
+                        domain = "TXNMY",
+                        title = canonical,
+                        subtitle = sub,
+                        fullContent = body,
+                        copyText = "$canonical ($sub)"
                     )
                 )
                 finish()
@@ -461,7 +683,7 @@ class ProcessTextActivity : Activity() {
                         domain = "URL",
                         title = finalHost,
                         subtitle = "Redirect Resolved",
-                        fullContent = "Target:\n$finalDestination\n\nOriginal:\n$rawUrl",
+                        fullContent = "Resolved Destination:\n$finalDestination\n\nOriginal Source:\n$rawUrl",
                         copyText = finalDestination
                     )
                 )
@@ -482,7 +704,7 @@ class ProcessTextActivity : Activity() {
                     detailPayload = LiveStatusReminder.InspectDetailPayload(
                         domain = "URL",
                         title = fallbackHost,
-                        subtitle = "Raw Link",
+                        subtitle = "Link Destination",
                         fullContent = rawUrl,
                         copyText = rawUrl
                     )
@@ -492,139 +714,111 @@ class ProcessTextActivity : Activity() {
         }
     }
 
-    private fun handleScientificConstant(rawText: String): Boolean {
-        val key = rawText.lowercase(Locale.ROOT).trim()
-        val constants = mapOf(
-            "c" to Triple("Speed of Light", "2.998 × 10⁸ m/s", "Speed of electromagnetic radiation in vacuum"),
-            "h" to Triple("Planck Constant", "6.626 × 10⁻³⁴ J·s", "Quantum of electromagnetic action relating energy to frequency"),
-            "hbar" to Triple("Reduced Planck", "1.055 × 10⁻³⁴ J·s", "ħ = h / (2π)"),
-            "k_b" to Triple("Boltzmann Constant", "1.381 × 10⁻²³ J/K", "Relates kinetic energy of particles with temperature"),
-            "kb" to Triple("Boltzmann Constant", "1.381 × 10⁻²³ J/K", "Relates kinetic energy of particles with temperature"),
-            "n_a" to Triple("Avogadro Constant", "6.022 × 10²³ mol⁻¹", "Number of constituent particles in one mole"),
-            "na" to Triple("Avogadro Constant", "6.022 × 10²³ mol⁻¹", "Number of constituent particles in one mole"),
-            "g" to Triple("Gravitational Constant", "6.674 × 10⁻¹¹ N·m²/kg²", "Newtonian constant of gravitation"),
-            "eps_0" to Triple("Vacuum Permittivity", "8.854 × 10⁻¹² F/m", "Capability of vacuum to permit electric fields"),
-            "mu_0" to Triple("Vacuum Permeability", "1.257 × 10⁻⁶ N/A²", "Magnetic constant in free space")
-        )
-
-        val found = constants[key] ?: return false
-        LiveStatusReminder.showCustomCapsule(
-            context = applicationContext,
-            pillText = found.second.split(" ").take(3).joinToString(" "),
-            iconName = "ic_functions",
-            title = found.first,
-            content = "${found.second} • ${found.third}",
-            timeoutSeconds = 15,
-            actions = listOf(getDismissAction()),
-            notificationId = INSPECT_NOTIFICATION_ID,
-            detailPayload = LiveStatusReminder.InspectDetailPayload(
-                domain = "CHMSTRY",
-                title = found.second,
-                subtitle = found.first,
-                fullContent = "${found.second}\n\n${found.third}",
-                copyText = found.second
-            )
-        )
-        finish()
-        return true
-    }
-
-    private fun handlePubChemLookup(term: String): Boolean {
-        return try {
-            val encoded = URLEncoder.encode(term, "UTF-8")
-            val url = URL("https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/$encoded/property/MolecularFormula,MolecularWeight,IUPACName,Title/JSON")
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 3000
-                readTimeout = 3000
-            }
-            if (conn.responseCode != 200) return false
-
-            val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-            val props = json.getJSONObject("PropertyTable").getJSONArray("Properties").getJSONObject(0)
-
-            val formula = props.optString("MolecularFormula", "")
-            val weight = props.optDouble("MolecularWeight", 0.0)
-            val name = props.optString("Title", term)
-            val iupac = props.optString("IUPACName", "")
-
-            val weightStr = if (weight > 0) String.format(Locale.ROOT, "%.2f g/mol", weight) else ""
-            val bodyBuilder = StringBuilder()
-            if (formula.isNotBlank()) bodyBuilder.append("Formula: $formula\n")
-            if (iupac.isNotBlank()) bodyBuilder.append("IUPAC: $iupac\n")
-
-            val domain = if (looksLikeChemicalOrDrug(term) && !formula.equals(term, ignoreCase = true)) "PHRM" else "CHMSTRY"
-
-            mainHandler.post {
-                LiveStatusReminder.showCustomCapsule(
-                    context = applicationContext,
-                    pillText = if (weightStr.isNotBlank()) weightStr else formula,
-                    iconName = "ic_science",
-                    title = name.uppercase(Locale.ROOT),
-                    content = if (weightStr.isNotBlank()) "$formula • $weightStr" else formula,
-                    timeoutSeconds = 18,
-                    actions = listOf(getDismissAction()),
-                    notificationId = INSPECT_NOTIFICATION_ID,
-                    detailPayload = LiveStatusReminder.InspectDetailPayload(
-                        domain = domain,
-                        title = name.uppercase(Locale.ROOT),
-                        subtitle = weightStr,
-                        fullContent = bodyBuilder.toString().trim(),
-                        copyText = "$name ($formula) $weightStr"
-                    )
-                )
-                finish()
-            }
-            true
-        } catch (_: Exception) {
-            false
+    private fun handleDictionaryLookup(rawText: String) {
+        val originalWord = rawText.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim().split("\\s+".toRegex()).firstOrNull() ?: ""
+        if (originalWord.isBlank()) {
+            finish()
+            return
         }
-    }
 
-    private fun handleGbifLookup(term: String): Boolean {
-        return try {
-            val encoded = URLEncoder.encode(term, "UTF-8")
-            val url = URL("https://api.gbif.org/v1/species/match?name=$encoded")
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 3000
-                readTimeout = 3000
+        val cleanWordLower = originalWord.lowercase(Locale.ROOT)
+        val appContext = applicationContext
+
+        try {
+            val encoded = URLEncoder.encode(cleanWordLower, "UTF-8")
+            val dictUrl = URL("https://api.dictionaryapi.dev/api/v2/entries/en/$encoded")
+            val dictConn = (dictUrl.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 4000
+                readTimeout = 4000
+                setRequestProperty("User-Agent", "Mozilla/5.0")
             }
-            if (conn.responseCode != 200) return false
 
-            val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-            val matchType = json.optString("matchType", "NONE")
-            if (matchType == "NONE") return false
+            if (dictConn.responseCode == 200) {
+                val resp = dictConn.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(resp)
+                val entry = jsonArray.getJSONObject(0)
 
-            val canonical = json.optString("canonicalName", term)
-            val kingdom = json.optString("kingdom", "")
-            val family = json.optString("family", "")
-            val status = json.optString("status", "ACCEPTED")
+                var phonetic = entry.optString("phonetic", "")
+                if (phonetic.isBlank()) {
+                    val phoneticsArr = entry.optJSONArray("phonetics")
+                    if (phoneticsArr != null) {
+                        for (i in 0 until phoneticsArr.length()) {
+                            val p = phoneticsArr.getJSONObject(i).optString("text", "")
+                            if (p.isNotBlank()) {
+                                phonetic = p
+                                break
+                            }
+                        }
+                    }
+                }
 
-            val subtitle = if (kingdom.isNotBlank() && family.isNotBlank()) "$kingdom • $family" else kingdom
-            val body = "Taxon Status: $status\nFamily: $family\nClassification: $kingdom"
+                val meanings = entry.optJSONArray("meanings")
+                val bodyBuilder = StringBuilder()
+                val synonyms = mutableSetOf<String>()
+
+                if (meanings != null) {
+                    for (i in 0 until meanings.length()) {
+                        val mObj = meanings.getJSONObject(i)
+                        val pos = mObj.optString("partOfSpeech", "").lowercase(Locale.ROOT)
+                        val defsArr = mObj.optJSONArray("definitions")
+
+                        if (defsArr != null && defsArr.length() > 0) {
+                            bodyBuilder.append(pos).append("\n")
+                            val limit = minOf(defsArr.length(), 2)
+                            for (d in 0 until limit) {
+                                val defText = defsArr.getJSONObject(d).optString("definition", "")
+                                bodyBuilder.append("  ${d + 1}. ").append(defText).append("\n")
+                            }
+                            bodyBuilder.append("\n")
+                        }
+
+                        val synArr = mObj.optJSONArray("synonyms")
+                        if (synArr != null) {
+                            for (s in 0 until synArr.length()) {
+                                val syn = synArr.optString(s, "")
+                                if (syn.isNotBlank()) synonyms.add(syn.lowercase(Locale.ROOT))
+                            }
+                        }
+                    }
+                }
+
+                if (synonyms.isNotEmpty()) {
+                    bodyBuilder.append("[ SYN: ").append(synonyms.take(3).joinToString(", ")).append(" ]")
+                }
+
+                val fullBody = bodyBuilder.toString().trim()
+                val pillText = synonyms.minByOrNull { it.length } ?: originalWord
+
+                mainHandler.post {
+                    LiveStatusReminder.showCustomCapsule(
+                        context = appContext,
+                        pillText = pillText,
+                        iconName = "ic_capsule_search",
+                        title = originalWord.replaceFirstChar { it.uppercase(Locale.ROOT) },
+                        content = phonetic.ifBlank { "Definition" },
+                        timeoutSeconds = 25,
+                        actions = listOf(getDismissAction()),
+                        notificationId = INSPECT_NOTIFICATION_ID,
+                        detailPayload = LiveStatusReminder.InspectDetailPayload(
+                            domain = "LXCN",
+                            title = originalWord.replaceFirstChar { it.uppercase(Locale.ROOT) },
+                            subtitle = phonetic,
+                            fullContent = fullBody,
+                            copyText = "$originalWord $phonetic\n\n$fullBody"
+                        )
+                    )
+                    finish()
+                }
+                return
+            }
 
             mainHandler.post {
-                LiveStatusReminder.showCustomCapsule(
-                    context = applicationContext,
-                    pillText = canonical,
-                    iconName = "ic_eco",
-                    title = canonical,
-                    content = subtitle,
-                    timeoutSeconds = 18,
-                    actions = listOf(getDismissAction()),
-                    notificationId = INSPECT_NOTIFICATION_ID,
-                    detailPayload = LiveStatusReminder.InspectDetailPayload(
-                        domain = "TXNMY",
-                        title = canonical,
-                        subtitle = subtitle,
-                        fullContent = body,
-                        copyText = "$canonical ($subtitle)"
-                    )
-                )
+                Toast.makeText(appContext, "No definition found", Toast.LENGTH_SHORT).show()
                 finish()
             }
-            true
-        } catch (_: Exception) {
-            false
+        } catch (e: Exception) {
+            Log.e("ProcessText", "Lookup error", e)
+            mainHandler.post { finish() }
         }
     }
 
@@ -789,8 +983,8 @@ class ProcessTextActivity : Activity() {
                             detailPayload = LiveStatusReminder.InspectDetailPayload(
                                 domain = "CHMSTRY",
                                 title = displayResult,
-                                subtitle = "$amount $baseCurrency Exchange Rate",
-                                fullContent = "$amount $baseCurrency = $displayResult\nBase: $baseCurrency",
+                                subtitle = "$amount $baseCurrency Conversion",
+                                fullContent = "$amount $baseCurrency = $displayResult\nExchange base: $baseCurrency",
                                 copyText = displayResult
                             )
                         )
@@ -801,163 +995,6 @@ class ProcessTextActivity : Activity() {
             } finally {
                 mainHandler.post { finish() }
             }
-        }
-    }
-
-    private fun handleDictionaryLookup(rawText: String) {
-        val originalWord = rawText.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim().split("\\s+".toRegex()).firstOrNull() ?: ""
-
-        if (originalWord.isBlank()) {
-            finish()
-            return
-        }
-
-        val cleanWordLower = originalWord.lowercase(Locale.ROOT)
-        val appContext = applicationContext
-
-        try {
-            val encoded = URLEncoder.encode(cleanWordLower, "UTF-8")
-            val dictUrl = URL("https://api.dictionaryapi.dev/api/v2/entries/en/$encoded")
-            val dictConn = (dictUrl.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 4000
-                readTimeout = 4000
-            }
-
-            if (dictConn.responseCode == 200) {
-                val resp = dictConn.inputStream.bufferedReader().use { it.readText() }
-                val jsonArray = JSONArray(resp)
-                val entry = jsonArray.getJSONObject(0)
-
-                // Extract IPA phonetics
-                var phonetic = entry.optString("phonetic", "")
-                if (phonetic.isBlank()) {
-                    val phoneticsArr = entry.optJSONArray("phonetics")
-                    if (phoneticsArr != null) {
-                        for (i in 0 until phoneticsArr.length()) {
-                            val p = phoneticsArr.getJSONObject(i).optString("text", "")
-                            if (p.isNotBlank()) {
-                                phonetic = p
-                                break
-                            }
-                        }
-                    }
-                }
-
-                // Extract definitions across all parts of speech
-                val meanings = entry.optJSONArray("meanings")
-                val bodyBuilder = StringBuilder()
-                val synonyms = mutableSetOf<String>()
-
-                if (meanings != null) {
-                    var counter = 1
-                    for (i in 0 until meanings.length()) {
-                        val meaningObj = meanings.getJSONObject(i)
-                        val partOfSpeech = meaningObj.optString("partOfSpeech", "").uppercase(Locale.ROOT)
-                        val defsArr = meaningObj.optJSONArray("definitions")
-
-                        if (defsArr != null && defsArr.length() > 0) {
-                            val firstDef = defsArr.getJSONObject(0).optString("definition", "")
-                            bodyBuilder.append(String.format(Locale.ROOT, "%02d. %s\n%s\n\n", counter++, partOfSpeech, firstDef))
-                        }
-
-                        val synArr = meaningObj.optJSONArray("synonyms")
-                        if (synArr != null) {
-                            for (s in 0 until synArr.length()) {
-                                val syn = synArr.optString(s, "")
-                                if (syn.isNotBlank()) synonyms.add(syn.uppercase(Locale.ROOT))
-                            }
-                        }
-                    }
-                }
-
-                if (synonyms.isNotEmpty()) {
-                    bodyBuilder.append("[ SYN: ").append(synonyms.take(3).joinToString(", ")).append(" ]")
-                }
-
-                val fullEditorialBody = bodyBuilder.toString().trim()
-                val shortestSyn = synonyms.minByOrNull { it.length }?.lowercase(Locale.ROOT)
-                val pillText = shortestSyn ?: originalWord
-
-                mainHandler.post {
-                    LiveStatusReminder.showCustomCapsule(
-                        context = appContext,
-                        pillText = pillText,
-                        iconName = "ic_capsule_search",
-                        title = originalWord.replaceFirstChar { it.uppercase() },
-                        content = phonetic.ifBlank { "Dictionary Lookup" },
-                        timeoutSeconds = 25,
-                        actions = listOf(getDismissAction()),
-                        notificationId = INSPECT_NOTIFICATION_ID,
-                        detailPayload = LiveStatusReminder.InspectDetailPayload(
-                            domain = "LXCN",
-                            title = originalWord.replaceFirstChar { it.uppercase() },
-                            subtitle = phonetic,
-                            fullContent = fullEditorialBody,
-                            copyText = "$originalWord $phonetic\n\n$fullEditorialBody"
-                        )
-                    )
-                    finish()
-                }
-                return
-            }
-
-            // Fallback to Datamuse if word is missing in primary dictionary
-            val defUrl = URL("https://api.datamuse.com/words?sp=$encoded&md=d&max=1")
-            val defConn = (defUrl.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 4000
-                readTimeout = 4000
-            }
-
-            var definitionText = ""
-            var pos = ""
-            if (defConn.responseCode == 200) {
-                val resp = defConn.inputStream.bufferedReader().use { it.readText() }
-                val array = JSONArray(resp)
-                if (array.length() > 0) {
-                    val defs = array.getJSONObject(0).optJSONArray("defs")
-                    if (defs != null && defs.length() > 0) {
-                        val parts = defs.getString(0).split("\t", limit = 2)
-                        if (parts.size > 1) {
-                            pos = parts[0].trim().uppercase(Locale.ROOT)
-                            definitionText = parts[1].trim()
-                        } else {
-                            definitionText = parts[0].trim()
-                        }
-                    }
-                }
-            }
-
-            if (definitionText.isNotBlank()) {
-                val body = "01. $pos\n$definitionText"
-                mainHandler.post {
-                    LiveStatusReminder.showCustomCapsule(
-                        context = appContext,
-                        pillText = originalWord,
-                        iconName = "ic_capsule_search",
-                        title = originalWord.replaceFirstChar { it.uppercase() },
-                        content = definitionText,
-                        timeoutSeconds = 20,
-                        actions = listOf(getDismissAction()),
-                        notificationId = INSPECT_NOTIFICATION_ID,
-                        detailPayload = LiveStatusReminder.InspectDetailPayload(
-                            domain = "LXCN",
-                            title = originalWord.replaceFirstChar { it.uppercase() },
-                            subtitle = "",
-                            fullContent = body,
-                            copyText = "$originalWord\n$body"
-                        )
-                    )
-                    finish()
-                }
-            } else {
-                mainHandler.post {
-                    Toast.makeText(appContext, "No definition found", Toast.LENGTH_SHORT).show()
-                    finish()
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("ProcessText", "Lookup error", e)
-            mainHandler.post { finish() }
         }
     }
 }
