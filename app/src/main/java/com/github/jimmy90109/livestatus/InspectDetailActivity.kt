@@ -6,11 +6,14 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
-import android.view.View
+import android.view.HapticFeedbackConstants
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -23,39 +26,51 @@ class InspectDetailActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Dismiss the associated notification when the user views the expanded sheet
+        // Dismiss associated capsule notification when expanded
         val notifId = intent.getIntExtra("EXTRA_NOTIFICATION_ID", -1)
         if (notifId != -1) {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             nm?.cancel(notifId)
         }
 
-        val titleText = intent.getStringExtra("EXTRA_TITLE") ?: "Details"
-        val subtitleText = intent.getStringExtra("EXTRA_SUBTITLE")
+        // Hardware Window Blur for Android 12+ (API 31+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes.blurBehindRadius = 70
+        }
+
+        val titleText = intent.getStringExtra("EXTRA_TITLE") ?: "LEXEME"
+        val subtitleText = intent.getStringExtra("EXTRA_SUBTITLE") ?: "INSPECT // SYSTEM"
         val fullContentText = intent.getStringExtra("EXTRA_FULL_CONTENT") ?: ""
         val copyPayload = intent.getStringExtra("EXTRA_COPY_PAYLOAD") ?: fullContentText
 
-        // Dimmed backdrop wrapper
+        val density = resources.displayMetrics.density
+
+        // Root Scrim
         val rootLayout = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#80000000"))
-            setOnClickListener { finish() }
+            setBackgroundColor(Color.parseColor("#40000000"))
+            setOnClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                finish()
+            }
         }
 
-        // Bottom Sheet Card container
+        // Neo-Brutalist Surface Container (Obsidian, 2dp High-Contrast Border, 28dp Radii)
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            val density = resources.displayMetrics.density
-            val pad = (20 * density).toInt()
-            setPadding(pad, pad, pad, pad)
+            val padH = (22 * density).toInt()
+            val padV = (20 * density).toInt()
+            setPadding(padH, (14 * density).toInt(), padH, padV)
+            
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#1E1E1E"))
+                setColor(Color.parseColor("#0C0C0E"))
+                setStroke((2 * density).toInt(), Color.parseColor("#27272A"))
                 cornerRadii = floatArrayOf(
-                    24 * density, 24 * density, // top-left
-                    24 * density, 24 * density, // top-right
+                    28 * density, 28 * density,
+                    28 * density, 28 * density,
                     0f, 0f, 0f, 0f
                 )
             }
-            // Prevent outside touches on the card itself from dismissing
             isClickable = true
         }
 
@@ -66,81 +81,149 @@ class InspectDetailActivity : Activity() {
             gravity = Gravity.BOTTOM
         }
 
-        // 1. Header Title
-        val titleView = TextView(this).apply {
-            text = titleText
-            textSize = 20f
-            setTextColor(Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        }
-        card.addView(titleView)
-
-        // 2. Subtitle (Optional)
-        if (!subtitleText.isNullOrBlank()) {
-            val subtitleView = TextView(this).apply {
-                text = subtitleText
-                textSize = 14f
-                setTextColor(Color.parseColor("#B0B0B0"))
-                setPadding(0, 4, 0, 0)
+        // 1. Accent Drag Handle (Cyber-Lime)
+        val dragHandle = FrameLayout(this).apply {
+            val handleWidth = (42 * density).toInt()
+            val handleHeight = (4 * density).toInt()
+            layoutParams = LinearLayout.LayoutParams(handleWidth, handleHeight).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                bottomMargin = (18 * density).toInt()
             }
-            card.addView(subtitleView)
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#CCFF00"))
+                cornerRadius = 2 * density
+            }
         }
+        card.addView(dragHandle)
 
-        // 3. Scrollable Expanded Content (Bypasses ColorOS 2-line cap)
+        // 2. Editorial Category Kicker
+        val kickerTag = TextView(this).apply {
+            text = subtitleText.uppercase()
+            textSize = 10f
+            setTextColor(Color.parseColor("#CCFF00"))
+            typeface = Typeface.create("sans-serif-condensed-medium", Typeface.BOLD)
+            letterSpacing = 0.16f
+        }
+        card.addView(kickerTag)
+
+        // 3. Monolithic Lexeme / Headline
+        val headlineView = TextView(this).apply {
+            text = titleText
+            textSize = 28f
+            setTextColor(Color.parseColor("#FAFAFA"))
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            letterSpacing = -0.02f
+            setPadding(0, (2 * density).toInt(), 0, (12 * density).toInt())
+        }
+        card.addView(headlineView)
+
+        // 4. Subtle Border Divider
+        val divider = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (1 * density).toInt()
+            ).apply {
+                bottomMargin = (14 * density).toInt()
+            }
+            setBackgroundColor(Color.parseColor("#27272A"))
+        }
+        card.addView(divider)
+
+        // 5. Scrollable Editorial Body
         val scrollView = ScrollView(this).apply {
-            val scrollParams = LinearLayout.LayoutParams(
+            layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                val density = resources.displayMetrics.density
-                topMargin = (16 * density).toInt()
-                bottomMargin = (16 * density).toInt()
+                weight = 1f
+                bottomMargin = (20 * density).toInt()
             }
-            layoutParams = scrollParams
+            isVerticalScrollBarEnabled = false
         }
 
         val contentView = TextView(this).apply {
-            text = fullContentText
-            textSize = 15f
-            setTextColor(Color.parseColor("#E0E0E0"))
-            setLineSpacing(0f, 1.25f)
+            text = formatEditorialBody(fullContentText)
+            textSize = 14f
+            setTextColor(Color.parseColor("#D4D4D8"))
+            setLineSpacing(0f, 1.35f)
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             setTextIsSelectable(true)
         }
         scrollView.addView(contentView)
         card.addView(scrollView)
 
-        // 4. Action Buttons (Copy & Dismiss)
+        // 6. Tactile Inverted Action Row
         val buttonRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
         }
 
         val copyButton = Button(this).apply {
-            text = "Copy"
-            setTextColor(Color.parseColor("#90CAF9"))
-            setBackgroundColor(Color.TRANSPARENT)
+            text = "COPY DATA"
+            textSize = 11f
+            setTextColor(Color.parseColor("#0C0C0E"))
+            typeface = Typeface.create("sans-serif-condensed-medium", Typeface.BOLD)
+            letterSpacing = 0.08f
+            
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#FAFAFA"))
+                cornerRadius = 14 * density
+            }
+            val padW = (18 * density).toInt()
+            setPadding(padW, 0, padW, 0)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                (38 * density).toInt()
+            ).apply {
+                marginEnd = (10 * density).toInt()
+            }
+            
             setOnClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                 val clip = ClipData.newPlainText("LiveStatus Detail", copyPayload)
                 clipboard?.setPrimaryClip(clip)
-                Toast.makeText(this@InspectDetailActivity, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@InspectDetailActivity, "COPIED TO CLIPBOARD", Toast.LENGTH_SHORT).show()
                 finish()
             }
         }
         buttonRow.addView(copyButton)
 
-        val closeButton = Button(this).apply {
-            text = "Close"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.TRANSPARENT)
-            setOnClickListener { finish() }
+        val dismissButton = Button(this).apply {
+            text = "DISMISS"
+            textSize = 11f
+            setTextColor(Color.parseColor("#A1A1AA"))
+            typeface = Typeface.create("sans-serif-condensed-medium", Typeface.BOLD)
+            letterSpacing = 0.08f
+            
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#18181B"))
+                setStroke((1 * density).toInt(), Color.parseColor("#3F3F46"))
+                cornerRadius = 14 * density
+            }
+            val padW = (16 * density).toInt()
+            setPadding(padW, 0, padW, 0)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                (38 * density).toInt()
+            )
+
+            setOnClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                finish()
+            }
         }
-        buttonRow.addView(closeButton)
+        buttonRow.addView(dismissButton)
 
         card.addView(buttonRow)
         rootLayout.addView(card, cardParams)
 
         setContentView(rootLayout)
+    }
+
+    private fun formatEditorialBody(raw: String): String {
+        // Enforces clean spacing between parts-of-speech or numbered list items
+        return raw.replace(Regex("""(?m)^([0-9]+\.\s)"""), "\n$1").trim()
     }
 
     override fun finish() {
