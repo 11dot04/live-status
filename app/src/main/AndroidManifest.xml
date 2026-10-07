@@ -63,7 +63,9 @@
             android:name=".InspectDetailActivity"
             android:exported="false"
             android:excludeFromRecents="true"
-            android:theme="@style/Theme.LiveStatusReminder.Dialog" />
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <activity
             android:name=".ui.home.YouBikeRegionPickerActivity"
