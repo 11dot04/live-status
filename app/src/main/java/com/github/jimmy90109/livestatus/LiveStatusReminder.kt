@@ -908,6 +908,7 @@ object LiveStatusReminder {
     }
 
     data class InspectDetailPayload(
+        val domain: String = "LXCN",
         val title: String,
         val subtitle: String = "",
         val fullContent: String,
@@ -986,6 +987,7 @@ object LiveStatusReminder {
         if (detailPayload != null) {
             val detailIntent = Intent(context, InspectDetailActivity::class.java).apply {
                 putExtra("EXTRA_NOTIFICATION_ID", notificationId)
+                putExtra("EXTRA_DOMAIN", detailPayload.domain)
                 putExtra("EXTRA_TITLE", detailPayload.title)
                 putExtra("EXTRA_SUBTITLE", detailPayload.subtitle)
                 putExtra("EXTRA_FULL_CONTENT", detailPayload.fullContent)
