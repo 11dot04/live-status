@@ -1,98 +1,98 @@
 [
   {
-    "package": "com.google.android.apps.nbu.paisa.user",
+    "package_name": "com.google.android.apps.nbu.paisa.user",
     "regex": "(?i)(?:received|credited with|sent you)\\D*₹?\\s*([\\d,]+(?:\\.\\d{2})?)",
-    "template": "₹{1}",
-    "icon": "ic_capsule_upi",
-    "timeoutSeconds": 15
+    "pill_text": "₹$1",
+    "icon_name": "ic_capsule_upi",
+    "timeout_seconds": 15
   },
   {
-    "package": "com.phonepe.app",
+    "package_name": "com.phonepe.app",
     "regex": "(?i)(?:credited by|received)\\D*₹?\\s*([\\d,]+(?:\\.\\d{2})?)",
-    "template": "₹{1}",
-    "icon": "ic_capsule_upi",
-    "timeoutSeconds": 15
-  }
+    "pill_text": "₹$1",
+    "icon_name": "ic_capsule_upi",
+    "timeout_seconds": 15
+  },
   {
-    "package": "org.brilliant.android",
+    "package_name": "org.brilliant.android",
     "regex": "(?i)(\\d+)\\s*(?:day streak|days streak)",
-    "template": "{1}d",
-    "icon": "ic_capsule_fire",
-    "timeoutSeconds": 180
+    "pill_text": "$1d",
+    "icon_name": "ic_capsule_fire",
+    "timeout_seconds": 180
   },
   {
-    "package": "com.chess",
+    "package_name": "com.chess",
     "regex": "(?i)(\\d+)[-\\s]*(?:day)?[-\\s]*streak",
-    "template": "{1}d",
-    "icon": "ic_capsule_flame",
-    "timeoutSeconds": 0
+    "pill_text": "$1d",
+    "icon_name": "ic_capsule_flame",
+    "timeout_seconds": 0
   },
   {
-    "package": "com.duolingo",
+    "package_name": "com.duolingo",
     "regex": "(?i)(\\d+)[-\\s]*(?:day)?[-\\s]*streak",
-    "template": "{1}d",
-    "icon": "ic_capsule_flame",
-    "timeoutSeconds": 0
+    "pill_text": "$1d",
+    "icon_name": "ic_capsule_flame",
+    "timeout_seconds": 0
   },
   {
-    "package": "com.matiks",
+    "package_name": "com.matiks",
     "regex": "(?i)(\\d+)\\s*(?:day streak|days streak|streak)",
-    "template": "{1}d",
-    "icon": "ic_capsule_fire",
-    "timeoutSeconds": 180
+    "pill_text": "$1d",
+    "icon_name": "ic_capsule_fire",
+    "timeout_seconds": 180
   },
   {
-    "package": "app.getglobo.android",
+    "package_name": "app.getglobo.android",
     "regex": "(?i)(\\d+)\\s*(?:day streak|days streak|streak)",
-    "template": "{1}d",
-    "icon": "ic_capsule_fire",
-    "timeoutSeconds": 180
+    "pill_text": "$1d",
+    "icon_name": "ic_capsule_fire",
+    "timeout_seconds": 180
   },
   {
-    "package": "com.android.printspooler",
+    "package_name": "com.android.printspooler",
     "regex": "(?i)printing page (\\d+) of (\\d+)|printing",
-    "template": "Page {1}/{2}",
-    "icon": "ic_capsule_print",
-    "timeoutSeconds": 30
-  }
+    "pill_text": "Page $1/$2",
+    "icon_name": "ic_capsule_print",
+    "timeout_seconds": 30
+  },
   {
-    "package": "com.google.android.calendar",
+    "package_name": "com.google.android.calendar",
     "regex": "(?i)in\\s+(\\d+\\s*(?:min|m|hr|h))",
-    "template": "in {1}",
-    "icon": "ic_capsule_calendar",
-    "timeoutSeconds": 30
+    "pill_text": "in $1",
+    "icon_name": "ic_capsule_calendar",
+    "timeout_seconds": 30
   },
   {
-    "package": "com.google.android.calendar",
+    "package_name": "com.google.android.calendar",
     "regex": "(\\d{1,2}:\\d{2}(?:\\s*[–-]\\s*\\d{1,2}:\\d{2})?(?:\\s*(?:AM|PM|am|pm))?)",
-    "template": "{1}",
-    "icon": "ic_capsule_calendar",
-    "timeoutSeconds": 30
+    "pill_text": "$1",
+    "icon_name": "ic_capsule_calendar",
+    "timeout_seconds": 30
   },
   {
-    "package": "com.oplus.calendar",
+    "package_name": "com.oplus.calendar",
     "regex": "(\\d{1,2}:\\d{2})",
-    "template": "{1}",
-    "icon": "ic_capsule_calendar",
-    "timeoutSeconds": 30
-  }
+    "pill_text": "$1",
+    "icon_name": "ic_capsule_calendar",
+    "timeout_seconds": 30
+  },
   {
     "package_name": "com.coloros.weather",
-    "regex": "(?i)(\\d{1,2}°(?:[CF])?)(?:\\s*[-·•,]?\\s*([a-zA-Z\\s]{3,15}))?",
+    "regex": "(?i)(\\d{1,2}°[CF]?)",
     "pill_text": "$1",
     "icon_name": "ic_weather_sunny",
     "timeout_seconds": 0
   },
   {
     "package_name": "com.coloros.weather.service",
-    "regex": "(?i)(\\d{1,2}°(?:[CF])?)(?:\\s*[-·•,]?\\s*([a-zA-Z\\s]{3,15}))?",
+    "regex": "(?i)(\\d{1,2}°[CF]?)",
     "pill_text": "$1",
     "icon_name": "ic_weather_sunny",
     "timeout_seconds": 0
   },
   {
     "package_name": "com.google.android.googlequicksearchbox",
-    "regex": "(?i)(\\d{1,2}°(?:[CF])?)(?:\\s*[-·•,]?\\s*([a-zA-Z\\s]{3,15}))?",
+    "regex": "(?i)(\\d{1,2}°[CF]?)",
     "pill_text": "$1",
     "icon_name": "ic_weather_sunny",
     "timeout_seconds": 0
