@@ -5,14 +5,18 @@ import android.app.NotificationManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
+import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -25,47 +29,43 @@ class InspectDetailActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Clear associated active pill
+        // API 31+ Hardware Gaussian Blur behind the floating sheet
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes.blurBehindRadius = 60
+        }
+        window.setBackgroundDrawableResource(android.R.color.transparent)
+
         val notifId = intent.getIntExtra("EXTRA_NOTIFICATION_ID", -1)
         if (notifId != -1) {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            nm?.cancel(notifId)
+            (getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)?.cancel(notifId)
         }
 
-        // Domain extraction & dynamic theming
         val domainTag = intent.getStringExtra("EXTRA_DOMAIN") ?: "LXCN"
-        val titleText = intent.getStringExtra("EXTRA_TITLE") ?: "LEXEME"
-        val phoneticSubtitle = intent.getStringExtra("EXTRA_SUBTITLE") ?: ""
+        val titleText = intent.getStringExtra("EXTRA_TITLE") ?: ""
+        val subtitleText = intent.getStringExtra("EXTRA_SUBTITLE") ?: ""
         val bodyContent = intent.getStringExtra("EXTRA_FULL_CONTENT") ?: ""
         val copyPayload = intent.getStringExtra("EXTRA_COPY_PAYLOAD") ?: bodyContent
 
         val palette = resolvePalette(domainTag)
         val density = resources.displayMetrics.density
 
-        // Root Scrim: clean transparent pass-through
+        // Root scrim
         val rootLayout = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#4D000000"))
-            setOnClickListener {
-                it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                finish()
-            }
+            setBackgroundColor(Color.parseColor("#33000000"))
+            setOnClickListener { finish() }
         }
 
-        // Frosted Glass Smoked Acrylic Card
+        // Floating Card: Detached margins, no outline/stroke
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             val padH = (20 * density).toInt()
-            val padV = (24 * density).toInt()
+            val padV = (22 * density).toInt()
             setPadding(padH, padV, padH, padV)
 
             background = GradientDrawable().apply {
                 setColor(palette.glassBg)
-                setStroke((1.5f * density).toInt(), palette.strokeColor)
-                cornerRadii = floatArrayOf(
-                    32 * density, 32 * density,
-                    32 * density, 32 * density,
-                    0f, 0f, 0f, 0f
-                )
+                cornerRadius = 24 * density
             }
             isClickable = true
         }
@@ -75,110 +75,93 @@ class InspectDetailActivity : Activity() {
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply {
             gravity = Gravity.BOTTOM
+            val marginH = (16 * density).toInt()
+            val marginB = (28 * density).toInt() // Detached cleanly from the bottom
+            setMargins(marginH, 0, marginH, marginB)
         }
 
-        // 1. Vertical Gutter Ribbon (-90° Rotated Monospace Banner)
-        val verticalSpine = TextView(this).apply {
-            text = domainTag.uppercase()
-            textSize = 11f
-            setTextColor(palette.accent)
-            typeface = Typeface.MONOSPACE
-            letterSpacing = 0.22f
-            rotation = -90f
-            includeFontPadding = false
-            layoutParams = LinearLayout.LayoutParams(
-                (28 * density).toInt(),
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                marginEnd = (12 * density).toInt()
-            }
+        // Single-column, un-wrapped vertical spine
+        val spineView = VerticalSpineView(this, domainTag.uppercase(), palette.accent)
+        val spineParams = LinearLayout.LayoutParams(
+            (26 * density).toInt(),
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            marginEnd = (14 * density).toInt()
         }
-        card.addView(verticalSpine)
+        card.addView(spineView, spineParams)
 
-        // 2. Main Content Flow
+        // Main content column
         val contentColumn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
-            )
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
 
-        // Lexeme Title: High-contrast Serif for words/taxa, Tabular Monospace for formulas/numbers
-        val isNumericOrFormula = titleText.any { it.isDigit() } ||
-                titleText.contains(Regex("""[=+\-×÷/%$€¥₹]""")) ||
-                domainTag == "CHMSTRY"
-
-        val headlineView = TextView(this).apply {
+        // Title: Serif for words/taxa, Tabular Monospace for pure numbers/stoichiometry
+        val isPureFormulaOrNumber = domainTag == "CHMSTRY" && titleText.any { it.isDigit() }
+        val headline = TextView(this).apply {
             text = titleText
-            setTextColor(Color.parseColor("#FAFAFA"))
-            if (isNumericOrFormula) {
+            setTextColor(Color.WHITE)
+            if (isPureFormulaOrNumber) {
                 typeface = Typeface.MONOSPACE
                 textSize = 24f
-                letterSpacing = 0.02f
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    fontFeatureSettings = "tnum"
-                }
             } else {
                 typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
                 textSize = 28f
                 letterSpacing = -0.02f
             }
         }
-        contentColumn.addView(headlineView)
+        contentColumn.addView(headline)
 
-        // Subtitle slot: IPA Phonetics or Scientific Nomenclature
-        if (phoneticSubtitle.isNotBlank()) {
-            val subView = TextView(this).apply {
-                text = phoneticSubtitle
+        // Subtitle (IPA or secondary designation)
+        if (subtitleText.isNotBlank()) {
+            val sub = TextView(this).apply {
+                text = subtitleText
                 textSize = 13f
                 setTextColor(palette.accent)
                 typeface = Typeface.MONOSPACE
-                letterSpacing = 0.05f
-                setPadding(0, (2 * density).toInt(), 0, (10 * density).toInt())
+                letterSpacing = 0.04f
+                setPadding(0, 0, 0, (12 * density).toInt())
             }
-            contentColumn.addView(subView)
+            contentColumn.addView(sub)
         } else {
-            headlineView.setPadding(0, 0, 0, (10 * density).toInt())
+            headline.setPadding(0, 0, 0, (12 * density).toInt())
         }
 
-        // Scrollable Multi-definition / Scholarly Body
-        val scrollView = ScrollView(this).apply {
+        // Body: Standard Sans-Serif for readability
+        val scroll = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                bottomMargin = (18 * density).toInt()
+                bottomMargin = (16 * density).toInt()
             }
             isVerticalScrollBarEnabled = false
         }
 
-        val bodyView = TextView(this).apply {
+        val body = TextView(this).apply {
             text = bodyContent
             textSize = 14f
-            setTextColor(Color.parseColor("#E4E4E7"))
-            setLineSpacing(0f, 1.35f)
+            setTextColor(Color.parseColor("#E0E0E0"))
+            setLineSpacing(0f, 1.38f)
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             setTextIsSelectable(true)
         }
-        scrollView.addView(bodyView)
-        contentColumn.addView(scrollView)
+        scroll.addView(body)
+        contentColumn.addView(scroll)
 
-        // 3. Tactile Minimalist Actions
-        val actionRow = LinearLayout(this).apply {
+        // Bottom Action Buttons
+        val actions = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
         }
 
-        val copyButton = Button(this).apply {
-            text = "CPY"
+        val copyBtn = Button(this).apply {
+            text = "COPY"
             textSize = 11f
-            setTextColor(Color.parseColor("#09090B"))
-            typeface = Typeface.create("sans-serif-condensed-medium", Typeface.BOLD)
-            letterSpacing = 0.12f
-
+            setTextColor(Color.BLACK)
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            letterSpacing = 0.08f
             background = GradientDrawable().apply {
                 setColor(palette.accent)
                 cornerRadius = 14 * density
@@ -187,31 +170,26 @@ class InspectDetailActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 (36 * density).toInt()
-            ).apply {
-                marginEnd = (10 * density).toInt()
-            }
+            ).apply { marginEnd = (10 * density).toInt() }
 
             setOnClickListener {
                 it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                val clip = ClipData.newPlainText("LiveStatus Data", copyPayload)
-                clipboard?.setPrimaryClip(clip)
-                Toast.makeText(this@InspectDetailActivity, "COPIED", Toast.LENGTH_SHORT).show()
+                val cb = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                cb?.setPrimaryClip(ClipData.newPlainText("LiveStatus", copyPayload))
+                Toast.makeText(this@InspectDetailActivity, "Copied", Toast.LENGTH_SHORT).show()
                 finish()
             }
         }
-        actionRow.addView(copyButton)
+        actions.addView(copyBtn)
 
-        val dismissButton = Button(this).apply {
-            text = "CLS"
+        val closeBtn = Button(this).apply {
+            text = "DISMISS"
             textSize = 11f
-            setTextColor(Color.parseColor("#A1A1AA"))
-            typeface = Typeface.create("sans-serif-condensed-medium", Typeface.BOLD)
-            letterSpacing = 0.12f
-
+            setTextColor(Color.parseColor("#CCCCCC"))
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            letterSpacing = 0.08f
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#18181B"))
-                setStroke((1 * density).toInt(), Color.parseColor("#27272A"))
+                setColor(Color.parseColor("#222226"))
                 cornerRadius = 14 * density
             }
             setPadding((14 * density).toInt(), 0, (14 * density).toInt(), 0)
@@ -225,42 +203,60 @@ class InspectDetailActivity : Activity() {
                 finish()
             }
         }
-        actionRow.addView(dismissButton)
+        actions.addView(closeBtn)
 
-        contentColumn.addView(actionRow)
+        contentColumn.addView(actions)
         card.addView(contentColumn)
         rootLayout.addView(card, cardParams)
 
         setContentView(rootLayout)
     }
 
-    private data class Palette(val glassBg: Int, val strokeColor: Int, val accent: Int)
+    private class VerticalSpineView(context: Context, private val text: String, color: Int) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            textSize = 32f
+            typeface = Typeface.MONOSPACE
+            letterSpacing = 0.22f
+        }
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val textWidth = paint.measureText(text)
+            setMeasuredDimension((28 * resources.displayMetrics.density).toInt(), textWidth.toInt() + 30)
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            canvas.save()
+            canvas.translate(width / 2f + 8f, height.toFloat() - 8f)
+            canvas.rotate(-90f)
+            canvas.drawText(text, 0f, 0f, paint)
+            canvas.restore()
+        }
+    }
+
+    private data class Palette(val glassBg: Int, val accent: Int)
 
     private fun resolvePalette(domain: String): Palette {
         return when (domain) {
             "PHRM", "MDCN" -> Palette(
-                glassBg = Color.parseColor("#E6140804"),
-                strokeColor = Color.parseColor("#4DF43B00"),
+                glassBg = Color.parseColor("#F2160804"),
                 accent = Color.parseColor("#F43B00") // Signal Vermilion
             )
             "CHMSTRY", "MLR" -> Palette(
-                glassBg = Color.parseColor("#E6141305"),
-                strokeColor = Color.parseColor("#4DF9E800"),
+                glassBg = Color.parseColor("#F2141305"),
                 accent = Color.parseColor("#F9E800") // Hazard Ochre
             )
             "TXNMY", "BTNY" -> Palette(
-                glassBg = Color.parseColor("#E607140B"),
-                strokeColor = Color.parseColor("#4D00FF66"),
+                glassBg = Color.parseColor("#F207140B"),
                 accent = Color.parseColor("#00FF66") // Acid Emerald
             )
             "URL", "DOMN" -> Palette(
-                glassBg = Color.parseColor("#E6080A14"),
-                strokeColor = Color.parseColor("#4D2E5BFF"),
+                glassBg = Color.parseColor("#F2080A14"),
                 accent = Color.parseColor("#2E5BFF") // Hyper Cobalt
             )
-            else -> Palette( // LXCN / Default
-                glassBg = Color.parseColor("#E60C0D0E"),
-                strokeColor = Color.parseColor("#4DCCFF00"),
+            else -> Palette(
+                glassBg = Color.parseColor("#F20C0D0E"),
                 accent = Color.parseColor("#CCFF00") // Toxic Lime
             )
         }
